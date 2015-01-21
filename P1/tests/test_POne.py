@@ -1,5 +1,6 @@
 __author__ = 'Jasper'
 import unittest
+import copy
 import POne
 
 
@@ -251,7 +252,7 @@ class EmbedTest(unittest.TestCase):
         # But we just want to test smooth_hide.
         # We don't want to combine complexity classify function
         self.THRESHOLD = 255
-        self.embed_obj = POne.Embed(self.IMAGE, self.THRESHOLD, self.T_STAR, self.MAX_OR_RANGE)
+        self.embed_obj = POne.Embed(copy.deepcopy(self.IMAGE), self.THRESHOLD, self.T_STAR, self.MAX_OR_RANGE)
         for row in xrange(0,
                           len(self.IMAGE) - self.BLOCK_SIZE + 1,
                           self.BLOCK_SIZE):
@@ -384,8 +385,7 @@ class EmbedTest(unittest.TestCase):
         # But we just want to test smooth_hide.
         # We don't want to combine complexity classify function
         self.THRESHOLD = 0
-        self.embed_obj = POne.Embed(self.IMAGE, self.THRESHOLD, self.T_STAR, self.MAX_OR_RANGE)
-
+        self.embed_obj = POne.Embed(copy.deepcopy(self.IMAGE), self.THRESHOLD, self.T_STAR, self.MAX_OR_RANGE)
         count = 0
         for row in xrange(0,
                           len(self.IMAGE) - self.BLOCK_SIZE + 1,

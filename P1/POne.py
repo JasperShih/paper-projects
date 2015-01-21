@@ -32,6 +32,13 @@ class Embed():
     capacity_bits = 0
     over_or_under_flow = []
 
+    # all_smooth_blocks in the image, no matter it can be embed or not
+    all_smooth_blocks = 0
+    all_complex_blocks = 0
+
+    # all_embeddable_smooth_blocks in the image
+    all_embeddable_smooth_blocks = 0
+    all_embeddable_complex_blocks = 0
 
     def __init__(self, image, threshold, t_star, max_or_range):
         self.image = image
@@ -221,6 +228,7 @@ class Embed():
         return psnr
 
     def hide(self):
+        print "TH:", self.THRESHOLD, "  T*:", self.T_STAR
         # generate a black image. Black(0) means un_embeddable_block.
         un_embeddable_block_image = [[0 for i in range(len(self.image))] for i in range(len(self.image[0]))]
         random_seed = random.random()
@@ -246,13 +254,18 @@ class Embed():
                 # i.e. we have to go through either smooth_hide or complex_hide.
                 # And we will update embeddable value in hide function of every block
 
-                # w = str(random.randint(0, 1))
-                # w += str(random.randint(0, 1))
-                w = "11"
+                w = str(random.randint(0, 1))
+                w += str(random.randint(0, 1))
                 if complexity == "smooth":
                     embeddable = self.hide_smooth(row, col, w)
+                    self.all_smooth_blocks += 1
+                    if embeddable:
+                        self.all_embeddable_smooth_blocks += 1
                 elif complexity == "complex":
                     embeddable = self.hide_complex(row, col, satellites, w)
+                    self.all_complex_blocks += 1
+                    if embeddable:
+                        self.all_embeddable_complex_blocks += 1
 
                 # Paint un_embeddable_block_image to white
                 # if this block is embeddable, we paint this entire block to white(255).
@@ -262,7 +275,6 @@ class Embed():
                         for col_within_this_block in xrange(col, col + self.BLOCK_SIZE):
                             un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
 
-
         #print self.image
         #print "capacity_blocks:", str(self.capacity_blocks)
         print "capacity_bits:", str(self.capacity_bits)
@@ -270,18 +282,26 @@ class Embed():
         #print un_embeddable_block_image
         print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
 
+        print "all_smooth_blocks:", self.all_smooth_blocks
+        print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
+        print "all_complex_blocks:", self.all_complex_blocks
+        print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
+        print "====================================="
+
 
 if __name__ == '__main__':
     IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\Lena.bmp"
-    THRESHOLD_LIST = 255
-    T_STAR_LIST = 0
-    MAX_OR_RANGE = 1  # 0=max, 1=range
+    THRESHOLD_LIST = [40, 50]
+    T_STAR_LIST = [0, 1, 2, 3, 4]
+    MAX_OR_RANGE = 0  # 0=max, 1=range
 
     img_misc = misc.imread(IMAGE_LIST)
     img_list = img_misc.tolist()
 
-    embed_obj = Embed(img_list, THRESHOLD_LIST, T_STAR_LIST, MAX_OR_RANGE)
-    embed_obj.hide()
+    for THRESHOLD in THRESHOLD_LIST:
+        for T_STAR in T_STAR_LIST:
+            embed_obj = Embed(copy.deepcopy(img_list), THRESHOLD, T_STAR, MAX_OR_RANGE)
+            embed_obj.hide()
 
 
 
