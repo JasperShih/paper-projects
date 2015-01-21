@@ -281,6 +281,7 @@ class Embed():
         #print self.over_or_under_flow
         #print un_embeddable_block_image
         print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
+        # We have to save T*, THRESHOLD, seed, over_underflow
 
         print "all_smooth_blocks:", self.all_smooth_blocks
         print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
@@ -291,8 +292,8 @@ class Embed():
 
 if __name__ == '__main__':
     IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\Lena.bmp"
-    THRESHOLD_LIST = [40, 50]
-    T_STAR_LIST = [0, 1, 2, 3, 4]
+    THRESHOLD_LIST = [40]
+    T_STAR_LIST = [1]
     MAX_OR_RANGE = 0  # 0=max, 1=range
 
     img_misc = misc.imread(IMAGE_LIST)
