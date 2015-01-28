@@ -3,216 +3,155 @@ __author__ = 'Jasper'
 import math
 import copy
 import random
-
 import scipy.misc as misc
 
 
-class IgnoreOutIndex:
-    def __init__(self):
-        pass
-
-    def __enter__(self):
-        return None
-
-    def __exit__(self, exception_type, exception_value, exception_traceback):
-        return True
-
-
 class Embed():
-    THRESHOLD = None  # Th
-    T_STAR = None  # T*
-    MAX_OR_RANGE = None
 
-    BLOCK_SIZE = 3
-    MID = (1, 1)
-
-    image = None
-    copy_image = None
-    capacity_blocks = 0
-    capacity_bits = 0
-    over_or_under_flow = []
-
-    # all_smooth_blocks in the image, no matter it can be embed or not
-    all_smooth_blocks = 0
-    all_complex_blocks = 0
-
-    # all_embeddable_smooth_blocks in the image
-    all_embeddable_smooth_blocks = 0
-    all_embeddable_complex_blocks = 0
-
-    def __init__(self, image, threshold, t_star, max_or_range):
+    def __init__(self, image, threshold, t_star):
         self.image = image
         self.copy_image = copy.deepcopy(self.image)
-        self.THRESHOLD = threshold
-        self.T_STAR = t_star
-        self.MAX_OR_RANGE = max_or_range
+        self.THRESHOLD = threshold  # Th
+        self.T_STAR = t_star  # T*
 
-    def get_satellites(self, row, col):
-        # Get satellites. If IndexError occurs, the satellite=None
-        # [SU, SD, SR, SL] are values, not indexes
-        with IgnoreOutIndex() as SU:
-            if (row + self.MID[0] - 3) >= 0:
-                SU = self.image[row + self.MID[0] - 3][col + self.MID[1]]
-        with IgnoreOutIndex() as SD:
-            # not the bottom block
-            if (row + 2 * self.BLOCK_SIZE) <= len(self.image):
-                SD = self.image[row + self.MID[0] + 3][col + self.MID[1]]
-        with IgnoreOutIndex() as SR:
-            # not the most right block
-            if (col + 2 * self.BLOCK_SIZE) <= len(self.image[0]):
-                SR = self.image[row + self.MID[0]][col + self.MID[1] + 3]
-        with IgnoreOutIndex() as SL:
-            if (col + self.MID[1] - 3) >= 0:
-                SL = self.image[row + self.MID[0]][col + self.MID[1] - 3]
+        self.BLOCK_SIZE = 3
+        self.MID = (1, 1)
 
-        # return satellites
-        return [SU, SD, SR, SL]
+        # capacity_blocks = all_embeddable_smooth_blocks+all_embeddable_complex_blocks
+        self.capacity_bits = 0
+        self.over_or_under_flow_bits = 0
+        self.over_or_under_flow = []
 
-    def max_classify(self, row, col, satellites):
-        buf = []
-        # buf=(|SL-C|,|SR-C|,|SU-C|,|SD-C|)
-        for sat in satellites:
-            if sat:
-                buf.append(abs(
-                    sat - self.image[row + self.MID[0]][col + self.MID[1]]
-                )
-                )
-        if max(buf) < self.THRESHOLD:
-            return "smooth"
-        else:
-            return "complex"
+        # all_smooth_blocks in the image, no matter it can be embed or not
+        self.all_smooth_blocks = 0
+        self.all_complex_blocks = 0
 
-    def range_classify(self, satellites):
-        buf = []
-        # buf=(SL,SR,SU,SD)
-        for sat in satellites:
-            if sat:
-                buf.append(sat)
+        # all_embeddable_smooth_blocks in the image
+        self.all_embeddable_smooth_blocks = 0
+        self.all_embeddable_complex_blocks = 0
 
-        dif = max(buf) - min(buf)
-        if dif < self.THRESHOLD:
-            return "smooth"
-        else:
-            return "complex"
+        self.horizontal_difference = None
+        self.vertical_difference = None
 
-    def hide_smooth(self, row, col, w):
+
+    def corner_classify(self, row, col):
+        # upper_left corner
+        upper_left = self.image[row][col]
+        upper_right = self.image[row][col+2]
+        lower_left = self.image[row+2][col]
+        lower_right = self.image[row+2][col+2]
+
+        self.horizontal_difference = abs(upper_left-upper_right) + abs(lower_left-lower_right)
+        self.vertical_difference = abs(upper_left-lower_left) + abs(upper_right-lower_right)
+
+        # return complexity
+        return self.horizontal_difference + self.vertical_difference
+
+    def difference_expand(self, value, watermark_bit, embeddable):
+        if -self.T_STAR <= value <= self.T_STAR:
+            value_prime = value * 2 + int(watermark_bit)
+            self.capacity_bits += 1
+            embeddable = 1
+        elif -self.T_STAR > value:
+            value_prime = value - self.T_STAR
+        elif self.T_STAR < value:
+            value_prime = value + self.T_STAR + 1
+
+        return value_prime, embeddable
+
+    def hide_smooth(self, row, col, block_watermark):
         central_row = row + self.MID[0]
         central_col = col + self.MID[1]
-        dL = self.image[central_row][central_col - 1] - self.image[central_row][central_col]
-        dR = self.image[central_row][central_col + 1] - self.image[central_row][central_col]
+        left_difference = self.image[central_row][central_col - 1] - self.image[central_row][central_col]
+        right_difference = self.image[central_row][central_col + 1] - self.image[central_row][central_col]
+        upper_difference = self.image[central_row - 1][central_col] - self.image[central_row][central_col]
+        lower_difference = self.image[central_row + 1][central_col] - self.image[central_row][central_col]
+
         embeddable = 0
+        left_difference_prime, embeddable = self.difference_expand(left_difference, block_watermark[0], embeddable)
+        right_difference_prime, embeddable = self.difference_expand(right_difference, block_watermark[1], embeddable)
+        upper_difference_prime, embeddable = self.difference_expand(upper_difference, block_watermark[2], embeddable)
+        lower_difference_prime, embeddable = self.difference_expand(lower_difference, block_watermark[3], embeddable)
 
-        if -self.T_STAR <= dL <= self.T_STAR:
-            dLPrime = dL * 2 + int(w[0])
-            self.capacity_bits += 1
-            embeddable = 1
-        elif -self.T_STAR > dL:
-            dLPrime = dL - self.T_STAR
-        elif self.T_STAR < dL:
-            dLPrime = dL + self.T_STAR + 1
 
-        if -self.T_STAR <= dR <= self.T_STAR:
-            dRPrime = dR * 2 + int(w[1])
-            self.capacity_bits += 1
-            embeddable = 1
-        elif -self.T_STAR > dR:
-            dRPrime = dR - self.T_STAR
-        elif self.T_STAR < dR:
-            dRPrime = dR + self.T_STAR + 1
-
-        if embeddable:
-            self.capacity_blocks += 1
-
-        self.image[central_row][central_col - 1] = dLPrime + self.image[central_row][central_col]
-        if (self.image[central_row][central_col - 1] > 255) or (self.image[central_row][central_col - 1] < 0):
-            print "overflow/underflow! 1"
-            self.image[central_row][central_col - 1] = self.copy_image[central_row][central_col - 1]
+        # left stego
+        modified_value = left_difference_prime + self.image[central_row][central_col]
+        if (modified_value > 255) or (modified_value < 0):
             self.over_or_under_flow.append((central_row, central_col - 1))
-        self.image[central_row][central_col + 1] = dRPrime + self.image[central_row][central_col]
-        if (self.image[central_row][central_col + 1] > 255) or (self.image[central_row][central_col + 1] < 0):
-            print "overflow/underflow! 2"
-            self.image[central_row][central_col + 1] = self.copy_image[central_row][central_col + 1]
+            self.over_or_under_flow_bits += 1
+        else:
+            self.image[central_row][central_col - 1] = modified_value
+        # right stego
+        modified_value = right_difference_prime + self.image[central_row][central_col]
+        if (modified_value > 255) or (modified_value < 0):
             self.over_or_under_flow.append((central_row, central_col + 1))
+            self.over_or_under_flow_bits += 1
+        else:
+            self.image[central_row][central_col + 1] = modified_value
+        # upper stego
+        modified_value = upper_difference_prime + self.image[central_row][central_col]
+        if (modified_value > 255) or (modified_value < 0):
+            self.over_or_under_flow.append((central_row - 1, central_col))
+            self.over_or_under_flow_bits += 1
+        else:
+            self.image[central_row - 1][central_col] = modified_value
+        # lower stego
+        modified_value = lower_difference_prime + self.image[central_row][central_col]
+        if (modified_value > 255) or (modified_value < 0):
+            self.over_or_under_flow.append((central_row + 1, central_col))
+            self.over_or_under_flow_bits += 1
+        else:
+            self.image[central_row + 1][central_col] = modified_value
 
         return embeddable
 
-    def get_adjacent_2blocks_and_bias(self, satellites):
-        # [SU, SD, SR, SL]
-        if (satellites[2] is not None) & (satellites[3] is not None):
-            # return adjacent_2blocks, location_bias[SR, SL]
-            return [satellites[2], satellites[3]], [[0, 1], [0, -1]]
-        elif (satellites[0] is not None) & (satellites[1] is not None):
-            # return adjacent_2blocks, location_bias[SU, SD]
-            return [satellites[0], satellites[1]], [[-1, 0], [1, 0]]
-        else:
-            buf = []
-            buf2 = []
-            adjacent_block_bias = [[-1, 0], [1, 0], [0, 1], [0, -1]]
-            for idx in xrange(len(satellites)):
-                if satellites[idx]:
-                    buf.append(satellites[idx])
-                    buf2.append(adjacent_block_bias[idx])
-            return buf, buf2
-
-    def get_stars(self, row, col, adjacent_2block):
-        LStar = int(math.floor((self.image[row + self.MID[0]][col + self.MID[1]] * 2 + adjacent_2block[0]) / 3))
-        RStar = int(math.floor((self.image[row + self.MID[0]][col + self.MID[1]] * 2 + adjacent_2block[1]) / 3))
-        minStar = min(abs(LStar - self.image[row + self.MID[0]][col + self.MID[1]]),
-                      abs(RStar - self.image[row + self.MID[0]][col + self.MID[1]]))
-        return [LStar, RStar, minStar]
-
-    def get_lr_locate_d(self, row, col, location_bias):
-        Llocat = (row + self.MID[0] + location_bias[0][0],
-                  col + self.MID[1] + location_bias[0][1])
-        Rlocat = (row + self.MID[0] + location_bias[1][0],
-                  col + self.MID[1] + location_bias[1][1])
-        dL = self.image[Llocat[0]][Llocat[1]] - self.image[row + self.MID[0]][col + self.MID[1]]
-        dR = self.image[Rlocat[0]][Rlocat[1]] - self.image[row + self.MID[0]][col + self.MID[1]]
-        return [Llocat, Rlocat, dL, dR]
-
-
-    def hide_complex(self, row, col, satellites, w):
-        adjacent_2blocks, location_bias = self.get_adjacent_2blocks_and_bias(satellites)
-        LStar, RStar, minStar = self.get_stars(row, col, adjacent_2blocks)
-        Llocat, Rlocat, dL, dR = self.get_lr_locate_d(row, col, location_bias)
-        dLStar = dL - minStar
-        dRStar = dR - minStar
+    def hide_complex(self, row, col, block_watermark):
+        central_row = row + self.MID[0]
+        central_col = col + self.MID[1]
+        left_difference = self.image[central_row][central_col - 1] - self.image[central_row][central_col]
+        right_difference = self.image[central_row][central_col + 1] - self.image[central_row][central_col]
+        upper_difference = self.image[central_row - 1][central_col] - self.image[central_row][central_col]
+        lower_difference = self.image[central_row + 1][central_col] - self.image[central_row][central_col]
 
         embeddable = 0
-        if -self.T_STAR <= dLStar <= self.T_STAR:
-            dLPrime = dLStar * 2 + int(w[0])
-            self.capacity_bits += 1
-            embeddable = 1
-        elif -self.T_STAR > dLStar:
-            dLPrime = dLStar - self.T_STAR
-        elif self.T_STAR < dLStar:
-            dLPrime = dLStar + self.T_STAR + 1
 
-        if -self.T_STAR <= dRStar <= self.T_STAR:
-            dRPrime = dRStar * 2 + int(w[1])
-            self.capacity_bits += 1
-            embeddable = 1
-        elif -self.T_STAR > dRStar:
-            dRPrime = dRStar - self.T_STAR
-        elif self.T_STAR < dRStar:
-            dRPrime = dRStar + self.T_STAR + 1
+        if self.vertical_difference >= self.horizontal_difference:
+            left_difference_prime, embeddable = self.difference_expand(left_difference, block_watermark[0], embeddable)
+            right_difference_prime, embeddable = self.difference_expand(right_difference, block_watermark[1], embeddable)
 
-        if embeddable == 1:
-            self.capacity_blocks += 1
+            # left stego
+            modified_value = left_difference_prime + self.image[central_row][central_col]
+            if (modified_value > 255) or (modified_value < 0):
+                self.over_or_under_flow.append((central_row, central_col - 1))
+                self.over_or_under_flow_bits += 1
+            else:
+                self.image[central_row][central_col - 1] = modified_value
+            # right stego
+            modified_value = right_difference_prime + self.image[central_row][central_col]
+            if (modified_value > 255) or (modified_value < 0):
+                self.over_or_under_flow.append((central_row, central_col + 1))
+                self.over_or_under_flow_bits += 1
+            else:
+                self.image[central_row][central_col + 1] = modified_value
 
+        elif self.vertical_difference < self.horizontal_difference:
+            upper_difference_prime, embeddable = self.difference_expand(upper_difference, block_watermark[2], embeddable)
+            lower_difference_prime, embeddable = self.difference_expand(lower_difference, block_watermark[3], embeddable)
 
-        # ======modify C this time=========
-        self.image[Llocat[0]][Llocat[1]] = dLPrime + self.image[row + self.MID[0]][col + self.MID[1]]
-        if (self.image[Llocat[0]][Llocat[1]] > 255) or (self.image[Llocat[0]][Llocat[1]] < 0):
-            print "overflow/underflow! 3"
-            self.image[Llocat[0]][Llocat[1]] = self.copy_image[Llocat[0]][Llocat[1]]
-            self.over_or_under_flow.append((Llocat[0], Llocat[1]))
-
-        self.image[Rlocat[0]][Rlocat[1]] = dRPrime + self.image[row + self.MID[0]][col + self.MID[1]]
-        if (self.image[Rlocat[0]][Rlocat[1]] > 255) or (self.image[Rlocat[0]][Rlocat[1]] < 0):
-            print "overflow/underflow! 4"
-            self.image[Rlocat[0]][Rlocat[1]] = self.copy_image[Rlocat[0]][Rlocat[1]]
-            self.over_or_under_flow.append((Rlocat[0], Rlocat[1]))
+            # upper stego
+            modified_value = upper_difference_prime + self.image[central_row][central_col]
+            if (modified_value > 255) or (modified_value < 0):
+                self.over_or_under_flow.append((central_row - 1, central_col))
+                self.over_or_under_flow_bits += 1
+            else:
+                self.image[central_row - 1][central_col] = modified_value
+            # lower stego
+            modified_value = lower_difference_prime + self.image[central_row][central_col]
+            if (modified_value > 255) or (modified_value < 0):
+                self.over_or_under_flow.append((central_row + 1, central_col))
+                self.over_or_under_flow_bits += 1
+            else:
+                self.image[central_row + 1][central_col] = modified_value
 
         return embeddable
 
@@ -227,8 +166,8 @@ class Embed():
         psnr = 10 * math.log((255 * 255) / MSE, 10)
         return psnr
 
+
     def hide(self):
-        print "TH:", self.THRESHOLD, "  T*:", self.T_STAR
         # generate a black image. Black(0) means un_embeddable_block.
         un_embeddable_block_image = [[0 for i in range(len(self.image))] for i in range(len(self.image[0]))]
         random_seed = random.random()
@@ -239,33 +178,33 @@ class Embed():
         # Throughout entire Img block by block
         for row in xrange(0, image_row_bound, self.BLOCK_SIZE):
             for col in xrange(0, image_col_bound, self.BLOCK_SIZE):
-                # Get satellites. If IndexError occurs, the satellite=None
-                # [SU, SD, SR, SL] are values, not indexes
-                satellites = self.get_satellites(row, col)
-
-                # Complexity computing
-                if MAX_OR_RANGE == 0:
-                    complexity = self.max_classify(row, col, satellites)
-                elif MAX_OR_RANGE == 1:
-                    complexity = self.range_classify(satellites)
-
+                complexity = self.corner_classify(row, col)
                 # Hiding
                 # we will set embeddable to 0/1 because complexity is either smooth or complex
                 # i.e. we have to go through either smooth_hide or complex_hide.
                 # And we will update embeddable value in hide function of every block
 
-                w = str(random.randint(0, 1))
-                w += str(random.randint(0, 1))
-                if complexity == "smooth":
-                    embeddable = self.hide_smooth(row, col, w)
+                # block_watermark sequence for be hided position of block:
+                # left, right, upper, lower
+
+                #block_watermark = ""
+                #for i in xrange(4):
+                #    block_watermark += str(random.randint(0, 1))
+                block_watermark = "1010"
+
+                # Smooth block
+                if complexity <= self.THRESHOLD:
+                    embeddable = self.hide_smooth(row, col, block_watermark)
                     self.all_smooth_blocks += 1
                     if embeddable:
                         self.all_embeddable_smooth_blocks += 1
-                elif complexity == "complex":
-                    embeddable = self.hide_complex(row, col, satellites, w)
+
+                elif complexity > self.THRESHOLD:
+                    embeddable = self.hide_complex(row, col, block_watermark)
                     self.all_complex_blocks += 1
                     if embeddable:
                         self.all_embeddable_complex_blocks += 1
+
 
                 # Paint un_embeddable_block_image to white
                 # if this block is embeddable, we paint this entire block to white(255).
@@ -278,7 +217,7 @@ class Embed():
         #print self.image
         #print "capacity_blocks:", str(self.capacity_blocks)
         print "capacity_bits:", str(self.capacity_bits)
-        #print self.over_or_under_flow
+        print "over_or_under_flow_bits:", self.over_or_under_flow_bits
         #print un_embeddable_block_image
         print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
 
@@ -289,18 +228,18 @@ class Embed():
         print "====================================="
 
 
+
 if __name__ == '__main__':
-    IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\debug.bmp"
-    THRESHOLD_LIST = [40, 50]
-    T_STAR_LIST = [0, 1, 2, 3, 4]
-    MAX_OR_RANGE = 0  # 0=max, 1=range
+    IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\lena.bmp"
+    THRESHOLD_LIST = [5]  # 50
+    T_STAR_LIST = [2]
 
     img_misc = misc.imread(IMAGE_LIST)
     img_list = img_misc.tolist()
 
     for THRESHOLD in THRESHOLD_LIST:
         for T_STAR in T_STAR_LIST:
-            embed_obj = Embed(copy.deepcopy(img_list), THRESHOLD, T_STAR, MAX_OR_RANGE)
+            embed_obj = Embed(copy.deepcopy(img_list), THRESHOLD, T_STAR)
             embed_obj.hide()
 
 
