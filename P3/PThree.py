@@ -1,9 +1,12 @@
+# -*- coding: utf8 -*-
 __author__ = 'Jasper'
 
 import math
 import copy
 import random
 import scipy.misc as misc
+import os
+import cPickle as Pickle
 
 
 class Embed():
@@ -187,10 +190,9 @@ class Embed():
                 # block_watermark sequence for be hided position of block:
                 # left, right, upper, lower
 
-                #block_watermark = ""
-                #for i in xrange(4):
-                #    block_watermark += str(random.randint(0, 1))
-                block_watermark = "1010"
+                block_watermark = ""
+                for i in xrange(4):
+                    block_watermark += str(random.randint(0, 1))
 
                 # Smooth block
                 if complexity <= self.THRESHOLD:
@@ -214,40 +216,68 @@ class Embed():
                         for col_within_this_block in xrange(col, col + self.BLOCK_SIZE):
                             un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
 
+
+        print IMAGE
+        print "TH:", self.THRESHOLD, "  T*:", self.T_STAR
         #print self.image
         #print "capacity_blocks:", str(self.capacity_blocks)
         print "capacity_bits:", str(self.capacity_bits)
         print "over_or_under_flow_bits:", self.over_or_under_flow_bits
         #print un_embeddable_block_image
         print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
-
-        print "all_smooth_blocks:", self.all_smooth_blocks
-        print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
-        print "all_complex_blocks:", self.all_complex_blocks
-        print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
+        #print "all_smooth_blocks:", self.all_smooth_blocks
+        #print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
+        #print "all_complex_blocks:", self.all_complex_blocks
+        #print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
         print "====================================="
+        output_name = get_output_name(IMAGE, self.THRESHOLD, self.T_STAR)
 
+        #  Save data for recovering(seed, over/under flow)
+        data_file = file(u"output//" + output_name + u".data", 'w')
+        Pickle.dump([random_seed, self.over_or_under_flow], data_file)
+        data_file.close()
+
+        #  Save stego image
+        for row in xrange(len(self.image)):
+                for col in xrange(len(self.image[0])):
+                    img_misc[row][col] = self.image[row][col]
+        misc.imsave(u"output//Stego" + output_name + u".bmp", img_misc)
+
+        #  Save unbeddable-block image
+        for row in xrange(len(un_embeddable_block_image)):
+                for col in xrange(len(un_embeddable_block_image[0])):
+                    img_misc[row][col] = un_embeddable_block_image[row][col]
+        misc.imsave(u"output//Unembeddable" + output_name + u".bmp", img_misc)
+
+#  integer to unicode string
+def int_to_uni(integer):
+    return str(integer).decode("utf-8")
+
+
+def get_output_name(image, threshold, t_star):
+    # picture_name_without_extension name
+    pic_name_without_ext = os.path.splitext(os.path.basename(image))[0]
+    return pic_name_without_ext + u"," + int_to_uni(threshold) + u"," + int_to_uni(t_star)
 
 
 if __name__ == '__main__':
-    IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\lena.bmp"
-    THRESHOLD_LIST = [5]  # 50
-    T_STAR_LIST = [2]
+    IMAGE_LIST = [u"C:\\Users\\Jasper\\Desktop\\Peppers.bmp"]
+    THRESHOLD_LIST = [1020]  # 1020 is max THRESHOLD
+    T_STAR_LIST = [10]
 
-    img_misc = misc.imread(IMAGE_LIST)
-    img_list = img_misc.tolist()
-
-    for THRESHOLD in THRESHOLD_LIST:
-        for T_STAR in T_STAR_LIST:
-            embed_obj = Embed(copy.deepcopy(img_list), THRESHOLD, T_STAR)
-            embed_obj.hide()
-
-
+    for IMAGE in IMAGE_LIST:
+        img_misc = misc.imread(IMAGE)
+        img = img_misc.tolist()
+        for THRESHOLD in THRESHOLD_LIST:
+            for T_STAR in T_STAR_LIST:
+                embed_obj = Embed(copy.deepcopy(img), THRESHOLD, T_STAR)
+                embed_obj.hide()
 
 
 
 
 
+# 取出, excel, paper4
 
 
 
