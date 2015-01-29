@@ -196,7 +196,7 @@ class EmbedTest(unittest.TestCase):
                 count += 1
         self.assertEqual(buf, complexity_answer)
 
-    def test_max_classify(self):
+    def test_range_classify(self):
         input_satellites = [[None, 114, 120, None],
                             [None, 153, 209, 120],
                             [None, 202, 164, 120],
