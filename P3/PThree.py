@@ -7,6 +7,7 @@ import random
 import scipy.misc as misc
 import os
 import cPickle as Pickle
+import xlsxwriter
 
 
 class Embed():
@@ -230,8 +231,21 @@ class Embed():
         #print "all_complex_blocks:", self.all_complex_blocks
         #print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
         print "====================================="
-        output_name = get_output_name(IMAGE, self.THRESHOLD, self.T_STAR)
 
+        if count_T_STAR is 0:
+            print "Next TH"
+            worksheet.write(1+count_THRESHOLD, 0, "TH=" + str(self.THRESHOLD))
+            #worksheet.write(0+count_THRESHOLD, 1, 'T*')
+            worksheet.write(1+count_THRESHOLD, 1, 'Capacity')
+            worksheet.write(2+count_THRESHOLD, 1, 'PSNR')
+
+        if count_THRESHOLD is 0:
+            worksheet.write(0, 2+count_T_STAR, self.T_STAR)  # T*
+        worksheet.write(1+count_THRESHOLD, 2+count_T_STAR, self.capacity_bits)  # Capacity
+        worksheet.write(2+count_THRESHOLD, 2+count_T_STAR, self.PSNR(self.copy_image, self.image))  # PSNR
+
+
+        output_name = get_output_name(IMAGE, self.THRESHOLD, self.T_STAR)
         #  Save data for recovering(seed, over/under flow)
         data_file = file(u"output//" + output_name + u".data", 'w')
         Pickle.dump([random_seed, self.over_or_under_flow], data_file)
@@ -261,17 +275,27 @@ def get_output_name(image, threshold, t_star):
 
 
 if __name__ == '__main__':
-    IMAGE_LIST = [u"C:\\Users\\Jasper\\Desktop\\Peppers.bmp"]
-    THRESHOLD_LIST = [1020]  # 1020 is max THRESHOLD
-    T_STAR_LIST = [10]
+    IMAGE_LIST = [u"C:\\Users\\Jasper\\Desktop\\Lena.bmp"]
+    THRESHOLD_LIST = [-1, 1020]  # 1020 is max THRESHOLD, -1
+    T_STAR_LIST = [0,1,2,3,4]
 
+
+    workbook = xlsxwriter.Workbook('output.xlsx')
+    worksheet = workbook.add_worksheet()
+    worksheet.set_column('A:O', 9)
+    worksheet.write(0, 1, 'T*')
+    count_THRESHOLD = 0
     for IMAGE in IMAGE_LIST:
         img_misc = misc.imread(IMAGE)
         img = img_misc.tolist()
         for THRESHOLD in THRESHOLD_LIST:
+            count_T_STAR = 0
             for T_STAR in T_STAR_LIST:
                 embed_obj = Embed(copy.deepcopy(img), THRESHOLD, T_STAR)
                 embed_obj.hide()
+                count_T_STAR += 1
+            count_THRESHOLD += 2
+    workbook.close()
 
 
 

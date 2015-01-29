@@ -23,6 +23,19 @@ class Recover():
         self.RANDOM_SEED = random_seed
         self.OVER_OR_UNDER_FLOW = over_or_under_flow
 
+    def corner_classify(self, row, col):
+        # upper_left corner
+        upper_left = self.image[row][col]
+        upper_right = self.image[row][col + 2]
+        lower_left = self.image[row + 2][col]
+        lower_right = self.image[row + 2][col + 2]
+
+        self.horizontal_difference = abs(upper_left - upper_right) + abs(lower_left - lower_right)
+        self.vertical_difference = abs(upper_left - lower_left) + abs(upper_right - lower_right)
+
+        # return complexity
+        return self.horizontal_difference + self.vertical_difference
+
     def undifference_expand(self, difference_value):
         if -self.TWO_T_STAR <= difference_value <= (self.TWO_T_STAR + 1):
             watermark_bit = str(difference_value % 2)
@@ -96,23 +109,81 @@ class Recover():
 
         return block_watermark
 
+    def extract_complex(self, row, col):
+        central_row = row + self.MID[0]
+        central_col = col + self.MID[1]
+        left_difference = self.image[central_row][central_col - 1] - self.image[central_row][central_col]
+        right_difference = self.image[central_row][central_col + 1] - self.image[central_row][central_col]
+        upper_difference = self.image[central_row - 1][central_col] - self.image[central_row][central_col]
+        lower_difference = self.image[central_row + 1][central_col] - self.image[central_row][central_col]
+        block_watermark = ""
+
+        if self.vertical_difference >= self.horizontal_difference:
+            # undifference_expand left_difference
+            overflow_flag = 0
+            for pair in self.OVER_OR_UNDER_FLOW:
+                if pair[0] == central_row and pair[1] == (central_col - 1):
+                    overflow_flag = 1
+                    block_watermark += '*'
+                    break
+            if overflow_flag is 0:
+                watermark_bit, original_value = self.undifference_expand(left_difference)
+                block_watermark += watermark_bit
+                self.image[central_row][central_col - 1] = original_value + self.image[central_row][central_col]
+
+            # undifference_expand right_difference
+            overflow_flag = 0
+            for pair in self.OVER_OR_UNDER_FLOW:
+                if pair[0] == central_row and pair[1] == (central_col + 1):
+                    overflow_flag = 1
+                    block_watermark += '*'
+                    break
+            if overflow_flag is 0:
+                watermark_bit, original_value = self.undifference_expand(right_difference)
+                block_watermark += watermark_bit
+                self.image[central_row][central_col + 1] = original_value + self.image[central_row][central_col]
+            # complete for upper, lower
+            block_watermark += "**"
+
+        elif self.vertical_difference < self.horizontal_difference:
+            # complete for left, right
+            block_watermark += "**"
+            # undifference_expand upper_difference
+            overflow_flag = 0
+            for pair in self.OVER_OR_UNDER_FLOW:
+                if pair[0] == (central_row - 1) and pair[1] == central_col:
+                    overflow_flag = 1
+                    block_watermark += '*'
+                    break
+            if overflow_flag is 0:
+                watermark_bit, original_value = self.undifference_expand(upper_difference)
+                block_watermark += watermark_bit
+                self.image[central_row - 1][central_col] = original_value + self.image[central_row][central_col]
+
+            # undifference_expand lower_difference
+            overflow_flag = 0
+            for pair in self.OVER_OR_UNDER_FLOW:
+                if pair[0] == (central_row + 1) and pair[1] == central_col:
+                    overflow_flag = 1
+                    block_watermark += '*'
+                    break
+            if overflow_flag is 0:
+                watermark_bit, original_value = self.undifference_expand(lower_difference)
+                block_watermark += watermark_bit
+                self.image[central_row + 1][central_col] = original_value + self.image[central_row][central_col]
+
+        return block_watermark
 
 
-    def corner_classify(self, row, col):
-        # upper_left corner
-        upper_left = self.image[row][col]
-        upper_right = self.image[row][col + 2]
-        lower_left = self.image[row + 2][col]
-        lower_right = self.image[row + 2][col + 2]
-
-        self.horizontal_difference = abs(upper_left - upper_right) + abs(lower_left - lower_right)
-        self.vertical_difference = abs(upper_left - lower_left) + abs(upper_right - lower_right)
-
-        # return complexity
-        return self.horizontal_difference + self.vertical_difference
 
     def extract(self):
         random.seed(self.RANDOM_SEED)
+        watermark = ""
+        for i in xrange(
+                (len(self.image)/self.BLOCK_SIZE) *
+                        (len(self.image[0])/self.BLOCK_SIZE) * 4):
+                    watermark += str(random.randint(0, 1))
+        collected_watermark = ""
 
         image_row_bound = len(self.image) - self.BLOCK_SIZE + 1
         image_col_bound = len(self.image[0]) - self.BLOCK_SIZE + 1
@@ -138,13 +209,12 @@ class Recover():
 
                 # Smooth block
                 if complexity <= self.THRESHOLD:
-                    self.extract_smooth(row, col)
+                    collected_watermark += self.extract_smooth(row, col)
+                elif complexity > self.THRESHOLD:
+                    collected_watermark += self.extract_complex(row, col)
 
 
                 """
-                elif complexity > self.THRESHOLD:
-                    embeddable = self.hide_complex(row, col, block_watermark)
-
                 # Paint un_embeddable_block_image to white
                 # if this block is embeddable, we paint this entire block to white(255).
                 # row_within_this_block/col_within_this_block = {0, 1, ......, self.BLOCK_SIZE}
@@ -154,7 +224,17 @@ class Recover():
                             un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
                 """
 
-        ORIGINAL_IMAGE = u"C:\\Users\\Jasper\\Desktop\\Peppers.bmp"
+        water_correct = 1
+        for i in xrange(len(watermark)):
+            if (watermark[i] == collected_watermark[i]) or \
+                    (collected_watermark[i] == '*'):
+                pass
+            else:
+                water_correct = 0
+        if water_correct == 1:
+            print "Watermark is correct"
+
+        ORIGINAL_IMAGE = u"C:\\Users\\Jasper\\Desktop\\Lena.bmp"
         Oimg_misc = misc.imread(ORIGINAL_IMAGE)
         Oimg = Oimg_misc.tolist()
         if Oimg == self.image:
@@ -180,7 +260,7 @@ def name_analysis(image):
 
 
 if __name__ == '__main__':
-    IMAGE_PATH = u"C:\\Users\\Jasper\\Desktop\\Pps\\P3\\output\\StegoPeppers,1020,10.bmp"
+    IMAGE_PATH = u"C:\\Users\\Jasper\\Desktop\\Pps\\P3\\output\\StegoLena,5,2.bmp"
     THRESHOLD, T_STAR, RANDOM_SEED, OVER_OR_UNDER_FLOW = name_analysis(IMAGE_PATH)
     img_misc = misc.imread(IMAGE_PATH)
     img = img_misc.tolist()
