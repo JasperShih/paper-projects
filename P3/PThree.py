@@ -275,9 +275,9 @@ def get_output_name(image, threshold, t_star):
 
 
 if __name__ == '__main__':
-    IMAGE_LIST = [u"C:\\Users\\Jasper\\Desktop\\Lena.bmp"]
-    THRESHOLD_LIST = [-1, 1020]  # 1020 is max THRESHOLD, -1
-    T_STAR_LIST = [0,1,2,3,4]
+    IMAGE_LIST = [u"C:\\Users\\joker\\Desktop\\Img.bmp"]
+    THRESHOLD_LIST = [5]  # 1020 is max THRESHOLD, -1
+    T_STAR_LIST = [2]
 
 
     workbook = xlsxwriter.Workbook('output.xlsx')
