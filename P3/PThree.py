@@ -11,7 +11,6 @@ import xlsxwriter
 
 
 class Embed():
-
     def __init__(self, image, threshold, t_star):
         self.image = image
         self.copy_image = copy.deepcopy(self.image)
@@ -41,12 +40,12 @@ class Embed():
     def corner_classify(self, row, col):
         # upper_left corner
         upper_left = self.image[row][col]
-        upper_right = self.image[row][col+2]
-        lower_left = self.image[row+2][col]
-        lower_right = self.image[row+2][col+2]
+        upper_right = self.image[row][col + 2]
+        lower_left = self.image[row + 2][col]
+        lower_right = self.image[row + 2][col + 2]
 
-        self.horizontal_difference = abs(upper_left-upper_right) + abs(lower_left-lower_right)
-        self.vertical_difference = abs(upper_left-lower_left) + abs(upper_right-lower_right)
+        self.horizontal_difference = abs(upper_left - upper_right) + abs(lower_left - lower_right)
+        self.vertical_difference = abs(upper_left - lower_left) + abs(upper_right - lower_right)
 
         # return complexity
         return self.horizontal_difference + self.vertical_difference
@@ -121,7 +120,8 @@ class Embed():
 
         if self.vertical_difference >= self.horizontal_difference:
             left_difference_prime, embeddable = self.difference_expand(left_difference, block_watermark[0], embeddable)
-            right_difference_prime, embeddable = self.difference_expand(right_difference, block_watermark[1], embeddable)
+            right_difference_prime, embeddable = self.difference_expand(right_difference, block_watermark[1],
+                                                                        embeddable)
 
             # left stego
             modified_value = left_difference_prime + self.image[central_row][central_col]
@@ -139,8 +139,10 @@ class Embed():
                 self.image[central_row][central_col + 1] = modified_value
 
         elif self.vertical_difference < self.horizontal_difference:
-            upper_difference_prime, embeddable = self.difference_expand(upper_difference, block_watermark[2], embeddable)
-            lower_difference_prime, embeddable = self.difference_expand(lower_difference, block_watermark[3], embeddable)
+            upper_difference_prime, embeddable = self.difference_expand(upper_difference, block_watermark[2],
+                                                                        embeddable)
+            lower_difference_prime, embeddable = self.difference_expand(lower_difference, block_watermark[3],
+                                                                        embeddable)
 
             # upper stego
             modified_value = upper_difference_prime + self.image[central_row][central_col]
@@ -217,53 +219,43 @@ class Embed():
                         for col_within_this_block in xrange(col, col + self.BLOCK_SIZE):
                             un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
 
-
-        print IMAGE
-        print "TH:", self.THRESHOLD, "  T*:", self.T_STAR
-        #print self.image
-        #print "capacity_blocks:", str(self.capacity_blocks)
-        print "capacity_bits:", str(self.capacity_bits)
-        print "over_or_under_flow_bits:", self.over_or_under_flow_bits
-        #print un_embeddable_block_image
-        print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
-        #print "all_smooth_blocks:", self.all_smooth_blocks
-        #print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
-        #print "all_complex_blocks:", self.all_complex_blocks
-        #print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
-        print "====================================="
-
-        if count_T_STAR is 0:
-            print "Next TH"
-            worksheet.write(1+count_THRESHOLD, 0, "TH=" + str(self.THRESHOLD))
-            #worksheet.write(0+count_THRESHOLD, 1, 'T*')
-            worksheet.write(1+count_THRESHOLD, 1, 'Capacity')
-            worksheet.write(2+count_THRESHOLD, 1, 'PSNR')
-
-        if count_THRESHOLD is 0:
-            worksheet.write(0, 2+count_T_STAR, self.T_STAR)  # T*
-        worksheet.write(1+count_THRESHOLD, 2+count_T_STAR, self.capacity_bits)  # Capacity
-        worksheet.write(2+count_THRESHOLD, 2+count_T_STAR, self.PSNR(self.copy_image, self.image))  # PSNR
-
-
         output_name = get_output_name(IMAGE, self.THRESHOLD, self.T_STAR)
-        #  Save data for recovering(seed, over/under flow)
+        # Save data for recovering(seed, over/under flow)
         data_file = file(u"output//" + output_name + u".data", 'w')
         Pickle.dump([random_seed, self.over_or_under_flow], data_file)
         data_file.close()
 
         #  Save stego image
         for row in xrange(len(self.image)):
-                for col in xrange(len(self.image[0])):
-                    img_misc[row][col] = self.image[row][col]
+            for col in xrange(len(self.image[0])):
+                img_misc[row][col] = self.image[row][col]
         misc.imsave(u"output//Stego" + output_name + u".bmp", img_misc)
 
         #  Save unbeddable-block image
         for row in xrange(len(un_embeddable_block_image)):
-                for col in xrange(len(un_embeddable_block_image[0])):
-                    img_misc[row][col] = un_embeddable_block_image[row][col]
+            for col in xrange(len(un_embeddable_block_image[0])):
+                img_misc[row][col] = un_embeddable_block_image[row][col]
         misc.imsave(u"output//Unembeddable" + output_name + u".bmp", img_misc)
 
-#  integer to unicode string
+
+        print IMAGE
+        print "TH:", self.THRESHOLD, "  T*:", self.T_STAR
+        #print "capacity_blocks:", str(self.capacity_blocks)
+        #print "capacity_bits:", str(self.capacity_bits)
+        #print "over_or_under_flow_bits:", self.over_or_under_flow_bits
+        #print un_embeddable_block_image
+        #print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
+        #print "all_smooth_blocks:", self.all_smooth_blocks
+        #print "all_embeddable_smooth_blocks:", self.all_embeddable_smooth_blocks
+        #print "all_complex_blocks:", self.all_complex_blocks
+        #print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
+        #print "====================================="
+
+        return [self.capacity_bits, self.over_or_under_flow_bits,
+                self.PSNR(self.copy_image, self.image)]
+
+
+# integer to unicode string
 def int_to_uni(integer):
     return str(integer).decode("utf-8")
 
@@ -275,33 +267,38 @@ def get_output_name(image, threshold, t_star):
 
 
 if __name__ == '__main__':
-    IMAGE_LIST = [u"C:\\Users\\Jasper\\Desktop\\Lena.bmp"]
-    THRESHOLD_LIST = [-1, 1020]  # 1020 is max THRESHOLD, -1
-    T_STAR_LIST = [0,1,2,3,4]
+    IMAGE_LIST = [u"original\\Toys.bmp"]  # TODO
+    THRESHOLD_LIST = [5, 10, 15, 20]  # 1020 is max THRESHOLD, -1 TODO
+    T_STAR_LIST = [0, 1, 2, 3, 4]  # TODO
 
+    IMAGE_LIST.sort()
+    THRESHOLD_LIST.sort()
+    T_STAR_LIST.sort()
 
-    workbook = xlsxwriter.Workbook('output.xlsx')
-    worksheet = workbook.add_worksheet()
-    worksheet.set_column('A:O', 9)
-    worksheet.write(0, 1, 'T*')
-    count_THRESHOLD = 0
+    result_list = []
     for IMAGE in IMAGE_LIST:
         img_misc = misc.imread(IMAGE)
         img = img_misc.tolist()
         for THRESHOLD in THRESHOLD_LIST:
-            count_T_STAR = 0
             for T_STAR in T_STAR_LIST:
+                result = [IMAGE[9:-4], THRESHOLD, T_STAR]
+
                 embed_obj = Embed(copy.deepcopy(img), THRESHOLD, T_STAR)
-                embed_obj.hide()
-                count_T_STAR += 1
-            count_THRESHOLD += 2
-    workbook.close()
+                # capacity, over_or_under_flow_bits, PSNR
+                result += embed_obj.hide()
+                result_list += [result]
+
+    summary_file = file(u"summary.data", 'w')
+    Pickle.dump(result_list, summary_file)
+    summary_file.close()
+    print result_list
+    #  result = [image name, threshold, T_STAR,
+    #  capacity, over_or_under_flow_bits, PSNR]
+
+    # stego = threshold, t_star
 
 
 
-
-
-# 取出, excel, paper4
 
 
 
