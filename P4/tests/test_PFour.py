@@ -66,7 +66,7 @@ class EmbedTest(unittest.TestCase):
             first_of_row = row % 2
             for col in xrange(first_of_row,
                               len(self.image[0]), 2):
-                buf += [embed_obj.get_four_adjacent_pixels(row, col)]
+                buf += [embed_obj.get_4adjacent_pixels(row, col)]
 
         self.assertEqual(buf, FOUR_PIXELS_ANSWER)
 
