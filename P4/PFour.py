@@ -85,6 +85,8 @@ class Embed():
 
 
                 random_bit = random.randint(0, 1)
+                #print random_bit,
+
                 embeddable = 0
                 if complexity < self.threshold:
                     difference_prime, embeddable = \
@@ -101,7 +103,7 @@ class Embed():
 
                     if embeddable:
                         un_embeddable_image[row][col] = 255
-
+        """
         # White part
         for row in xrange(0, len(self.image)):
             # If current row is odd, first_of_row = 1
@@ -135,7 +137,7 @@ class Embed():
 
                     if embeddable:
                         un_embeddable_image[row][col] = 255
-
+        """
 
         print self.capacity_bits
         print self.PSNR(self.image_misc, self.image)
