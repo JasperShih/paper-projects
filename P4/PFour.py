@@ -64,8 +64,8 @@ class Embed():
 
     def hide(self):
         un_embeddable_image = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
-        # random_seed = random.random() TODO
-        # random.seed(random_seed)
+        random_seed = random.random()
+        random.seed(random_seed)
 
         # Throughout_image_by_chessboard
         # Black part
@@ -78,14 +78,11 @@ class Embed():
                 # We filtered elements which are None
                 filtered_4pixels = filter(None, self.get_4adjacent_pixels(row, col))
                 filtered_4pixels_avg = self.avg_reduce(lambda a, b: a + b, filtered_4pixels)
-
                 complexity = max(
                     map(lambda a: a - filtered_4pixels_avg, filtered_4pixels)
                 )
 
-
                 random_bit = random.randint(0, 1)
-                #print random_bit,
 
                 embeddable = 0
                 if complexity < self.threshold:
@@ -103,7 +100,7 @@ class Embed():
 
                     if embeddable:
                         un_embeddable_image[row][col] = 255
-        """
+        #"""
         # White part
         for row in xrange(0, len(self.image)):
             # If current row is odd, first_of_row = 1
@@ -137,12 +134,16 @@ class Embed():
 
                     if embeddable:
                         un_embeddable_image[row][col] = 255
-        """
+        #"""
 
         print self.capacity_bits
         print self.PSNR(self.image_misc, self.image)
         print self.over_or_under_flow_bits
 
+        # Save data for recovering(seed, over/under flow)
+        data_file = file(u"output//stego.data", 'w')
+        Pickle.dump([random_seed, self.over_or_under_flow], data_file)
+        data_file.close()
 
         #  Save stego image
         for row in xrange(len(self.image)):
@@ -167,7 +168,7 @@ def main(image_path, threshold, t_star):
 
 if __name__ == '__main__':
     # image, threshold, t_star
-    main("C:\\Users\\Jasper\\Desktop\\image\\Lena.bmp",
+    main("C:\\Users\\Jasper\\Desktop\\image\\Peppers.bmp",
          255, 255)
 
 
