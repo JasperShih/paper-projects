@@ -22,6 +22,8 @@ class Embed():
         self.over_or_under_flow = []
         self.over_or_under_flow_bits = 0
         self.un_embeddable_image = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+        self.un_embeddable_image2 = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+        self.block_size = 3  # TODO
 
     def get_4adjacent_pixels(self, row, col):
         # Top, left, right, bot
@@ -144,6 +146,26 @@ class Embed():
         self.save_image(self.un_embeddable_image, self.image_misc, u"output//Unembeddable.bmp")
 
 
+        image_row_bound = len(self.image) - self.block_size + 1
+        image_col_bound = len(self.image[0]) - self.block_size + 1
+        for row in xrange(0, image_row_bound, self.block_size):
+            for col in xrange(0, image_col_bound, self.block_size):
+                paint = 0
+                for row_within_this_block in xrange(row, row + self.block_size):
+                    for col_within_this_block in xrange(col, col + self.block_size):
+                        if self.un_embeddable_image[row_within_this_block][col_within_this_block] == 255:
+                            paint = 1
+                if paint:
+                    for row_within_this_block in xrange(row, row + self.block_size):
+                        for col_within_this_block in xrange(col, col + self.block_size):
+                            self.un_embeddable_image2[row_within_this_block][col_within_this_block] = 255
+
+        #  Save unbeddable-block image
+        self.save_image(self.un_embeddable_image2, self.image_misc, u"output//Unembeddable2.bmp")
+
+
+
+
 
 def main(image_path, threshold, t_star, rounds):
     embed_obj = Embed(image_path, threshold, t_star, rounds)
@@ -153,7 +175,7 @@ def main(image_path, threshold, t_star, rounds):
 if __name__ == '__main__':
     # image, threshold, t_star
     main("C:\\Users\\Jasper\\Desktop\\image\\Lena.bmp",
-         5, 255, 1)
+         255, 255, 1)
 
 
 

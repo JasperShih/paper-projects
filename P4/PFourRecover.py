@@ -14,9 +14,10 @@ class Recover():
     def __init__(self, image_path):
         self.image_misc = misc.imread(image_path)
         self.image = self.image_misc.tolist()
-        self.threshold = 3
+        self.threshold = 255
         self.t_star = 255
-        self.round = 2
+        self.round = 1
+        self.block_size = 3  # TODO
 
         data_file = file(u"output//stego.data", 'r')
         # [(row, col), (row, col), ......]
@@ -81,7 +82,6 @@ class Recover():
                 self.image[row][col] = original_value + filtered_4pixels_avg
         self.buf += watermark_bit
 
-
     def extract_white(self):
         self.buf = ""
         for row in reversed(xrange(0, len(self.image))):
@@ -106,6 +106,47 @@ class Recover():
         # extracted_watermark is reversed order
         return self.buf[::-1]
 
+    def generated_watermark(self):
+        generated_watermark = ""
+        for i in xrange(len(self.image) * len(self.image[0]) * self.round):
+            generated_watermark += str(random.randint(0, 1))
+        return generated_watermark
+
+    def black_white_interlock(self, input_str):
+        # input_str = black + white
+        white_start = int(math.ceil(float(len(input_str)) / 2))
+        output_str = ""
+        anchor = 0
+        for row in xrange(len(self.image)):
+            for col in xrange(len(self.image[0])):
+                # If (row and col belong even) and
+                # (row and col belong odd), we take black part
+                if (row % 2 == 0 and col % 2 == 0) or \
+                        (row % 2 == 1 and col % 2 == 1):
+                    output_str += input_str[anchor]
+
+                # If (row belong even and col belong odd) and
+                # (row belong odd and col belong even),
+                # we take white part
+                else:
+                    output_str += input_str[white_start + anchor]
+                if col % 2 == 1:
+                    anchor += 1
+        return output_str
+
+    def str_to_2Dlist(self, input_str):
+        output_list = []
+        for row in xrange(len(self.image)):
+            row_start = row*len(self.image[0])
+            output_list += [input_str[row_start:row_start+len(self.image[0])]]
+        return output_list
+
+    # Save content_image by stored_image with save_name
+    def save_image(self, content_image, stored_image, save_name):
+        for row in xrange(len(content_image)):
+            for col in xrange(len(content_image[0])):
+                stored_image[row][col] = content_image[row][col]
+        misc.imsave(save_name, stored_image)
 
     def extract(self):
         extracted_watermark = ""
@@ -125,14 +166,8 @@ class Recover():
             # print ori_image
             # print self.image
 
-
-
         random.seed(self.random_seed)
-        regenerated_watermark = ""
-        for i in xrange(
-                        len(self.image) * len(self.image[0]) * self.round
-        ):
-            regenerated_watermark += str(random.randint(0, 1))
+        regenerated_watermark = self.generated_watermark()
 
         for i in xrange(len(extracted_watermark)):
             if extracted_watermark[i] == '*' or \
@@ -144,8 +179,35 @@ class Recover():
         else:
             print "Yes"
 
-        #print extracted_watermark[250000:280000]
-        #print regenerated_watermark[250000:280000]
+        # Reorder watermark string by black_and_white_interlocking
+        # and transform into 2d list
+        inter2d_regenerated_watermark = self.str_to_2Dlist(
+            self.black_white_interlock(regenerated_watermark))
+        inter2d_extracted_watermark = self.str_to_2Dlist(
+            self.black_white_interlock(extracted_watermark))
+        detected_image = [[255 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+
+        image_row_bound = len(self.image) - self.block_size + 1
+        image_col_bound = len(self.image[0]) - self.block_size + 1
+        for row in xrange(0, image_row_bound, self.block_size):
+            for col in xrange(0, image_col_bound, self.block_size):
+                paint = 0
+                for row_within_this_block in xrange(row, row + self.block_size):
+                    for col_within_this_block in xrange(col, col + self.block_size):
+                        if inter2d_extracted_watermark[row_within_this_block][col_within_this_block] == '*' or\
+                                        inter2d_extracted_watermark[row_within_this_block][col_within_this_block] == \
+                                        inter2d_regenerated_watermark[row_within_this_block][col_within_this_block]:
+                            pass
+                        else:
+                            paint = 1
+
+                if paint:
+                    for row_within_this_block in xrange(row, row + self.block_size):
+                        for col_within_this_block in xrange(col, col + self.block_size):
+                            detected_image[row_within_this_block][col_within_this_block] = 0
+
+        #  Save detected image
+        self.save_image(detected_image, self.image_misc, u"output//detected.bmp")
 
 
 def main(image_path):
@@ -154,7 +216,7 @@ def main(image_path):
 
 
 if __name__ == '__main__':
-    main("C:\\Users\\Jasper\\Desktop\\Pps\\P4\\output\\Stego.bmp")
+    main("C:\\Users\\Jasper\\Desktop\\Pps\\P4\\output\\TamperedStego.bmp")
 
 
 
