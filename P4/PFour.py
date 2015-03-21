@@ -11,15 +11,17 @@ import xlsxwriter
 
 
 class Embed():
-    def __init__(self, image_path, threshold, t_star):
+    def __init__(self, image_path, threshold, t_star, rounds):
         self.image_misc = misc.imread(image_path)
         self.image = self.image_misc.tolist()
         self.threshold = threshold
         self.t_star = t_star
+        self.rounds = rounds
 
         self.capacity_bits = 0
         self.over_or_under_flow = []
         self.over_or_under_flow_bits = 0
+        self.un_embeddable_image = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
 
     def get_4adjacent_pixels(self, row, col):
         # Top, left, right, bot
@@ -62,79 +64,70 @@ class Embed():
         psnr = 10 * math.log((255 * 255) / MSE, 10)
         return psnr
 
-    def hide(self):
-        un_embeddable_image = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
-        random_seed = random.random()
-        random.seed(random_seed)
+    def hide_same_part(self, row, col):
+        # We filtered elements which are None
+        filtered_4pixels = filter(None, self.get_4adjacent_pixels(row, col))
+        filtered_4pixels_avg = self.avg_reduce(lambda a, b: a + b, filtered_4pixels)
+        complexity = max(
+            map(lambda a: a - filtered_4pixels_avg, filtered_4pixels)
+        )
 
-        # Throughout_image_by_chessboard
-        # Black part
+        random_bit = random.randint(0, 1)
+
+        embeddable = 0
+        if complexity < self.threshold:
+            difference_prime, embeddable = \
+                self.difference_expand(self.image[row][col] - filtered_4pixels_avg,
+                                       random_bit, embeddable)
+
+            modified_value = difference_prime + filtered_4pixels_avg
+            if (modified_value > 255) or (modified_value < 0):
+                self.over_or_under_flow.append((row, col))
+                self.over_or_under_flow_bits += 1
+                if embeddable:
+                    self.capacity_bits -= 1
+                embeddable = 0
+            else:
+                self.image[row][col] = modified_value
+
+            if embeddable:
+                self.un_embeddable_image[row][col] = 255
+
+    def hide_black(self):
         for row in xrange(0, len(self.image)):
             # If current row is odd, first_of_row = 0
             # If current row is even, first_of_row = 1
             first_of_row = row % 2
             for col in xrange(first_of_row,
                               len(self.image[0]), 2):
-                # We filtered elements which are None
-                filtered_4pixels = filter(None, self.get_4adjacent_pixels(row, col))
-                filtered_4pixels_avg = self.avg_reduce(lambda a, b: a + b, filtered_4pixels)
-                complexity = max(
-                    map(lambda a: a - filtered_4pixels_avg, filtered_4pixels)
-                )
+                self.hide_same_part(row, col)
 
-                random_bit = random.randint(0, 1)
-
-                embeddable = 0
-                if complexity < self.threshold:
-                    difference_prime, embeddable = \
-                        self.difference_expand(self.image[row][col] - filtered_4pixels_avg,
-                                               random_bit, embeddable)
-
-                    modified_value = difference_prime + filtered_4pixels_avg
-                    if (modified_value > 255) or (modified_value < 0):
-                        self.over_or_under_flow.append((row, col))
-                        self.over_or_under_flow_bits += 1
-                        embeddable = 0
-                    else:
-                        self.image[row][col] = modified_value
-
-                    if embeddable:
-                        un_embeddable_image[row][col] = 255
-        #"""
-        # White part
+    def hide_white(self):
         for row in xrange(0, len(self.image)):
             # If current row is odd, first_of_row = 1
             # If current row is even, first_of_row = 0
-            first_of_row = (row+1) % 2
+            first_of_row = (row + 1) % 2
             for col in xrange(first_of_row,
                               len(self.image[0]), 2):
-                # We filtered elements which are None
-                filtered_4pixels = filter(None, self.get_4adjacent_pixels(row, col))
-                filtered_4pixels_avg = self.avg_reduce(lambda a, b: a + b, filtered_4pixels)
+                self.hide_same_part(row, col)
 
-                complexity = max(
-                    map(lambda a: a - filtered_4pixels_avg, filtered_4pixels)
-                )
+    # Save content_image by stored_image with save_name
+    def save_image(self, content_image, stored_image, save_name):
+        for row in xrange(len(content_image)):
+            for col in xrange(len(content_image[0])):
+                stored_image[row][col] = content_image[row][col]
+        misc.imsave(save_name, stored_image)
 
+    def hide(self):
+        random_seed = random.random()
+        random.seed(random_seed)
 
-                random_bit = random.randint(0, 1)
-                embeddable = 0
-                if complexity < self.threshold:
-                    difference_prime, embeddable = \
-                        self.difference_expand(self.image[row][col] - filtered_4pixels_avg,
-                                               random_bit, embeddable)
+        # Throughout_image_by_chessboard
+        for i in xrange(self.rounds):
+            self.hide_black()
+            self.hide_white()
 
-                    modified_value = difference_prime + filtered_4pixels_avg
-                    if (modified_value > 255) or (modified_value < 0):
-                        self.over_or_under_flow.append((row, col))
-                        self.over_or_under_flow_bits += 1
-                        embeddable = 0
-                    else:
-                        self.image[row][col] = modified_value
-
-                    if embeddable:
-                        un_embeddable_image[row][col] = 255
-        #"""
+        # ============================= Executed ================================
 
         print self.capacity_bits
         print self.PSNR(self.image_misc, self.image)
@@ -145,31 +138,22 @@ class Embed():
         Pickle.dump([random_seed, self.over_or_under_flow], data_file)
         data_file.close()
 
-        #  Save stego image
-        for row in xrange(len(self.image)):
-            for col in xrange(len(self.image[0])):
-                self.image_misc[row][col] = self.image[row][col]
-        misc.imsave(u"output//Stego.bmp", self.image_misc)
-
-
+        # Save stego image
+        self.save_image(self.image, self.image_misc, u"output//Stego.bmp")
         #  Save unbeddable-block image
-        for row in xrange(len(un_embeddable_image)):
-            for col in xrange(len(un_embeddable_image[0])):
-                self.image_misc[row][col] = un_embeddable_image[row][col]
-        misc.imsave(u"output//Unembeddable.bmp", self.image_misc)
+        self.save_image(self.un_embeddable_image, self.image_misc, u"output//Unembeddable.bmp")
 
 
 
-
-def main(image_path, threshold, t_star):
-    embed_obj = Embed(image_path, threshold, t_star)
+def main(image_path, threshold, t_star, rounds):
+    embed_obj = Embed(image_path, threshold, t_star, rounds)
     embed_obj.hide()
 
 
 if __name__ == '__main__':
     # image, threshold, t_star
-    main("C:\\Users\\Jasper\\Desktop\\image\\Peppers.bmp",
-         255, 255)
+    main("C:\\Users\\Jasper\\Desktop\\image\\Lena.bmp",
+         5, 255, 1)
 
 
 
