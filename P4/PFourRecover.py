@@ -11,19 +11,17 @@ import xlsxwriter
 
 
 class Recover():
-    def __init__(self, image_path):
+    def __init__(self, image_path, threshold, t_star, random_seed, over_or_under_flow, block_size):
         self.image_misc = misc.imread(image_path)
         self.image = self.image_misc.tolist()
-        self.threshold = 255
-        self.t_star = 255
-        self.round = 1
-        self.block_size = 3  # TODO
-
-        data_file = file(u"output//stego.data", 'r')
+        self.threshold = threshold
+        self.t_star = t_star
+        self.block_size = block_size
+        self.random_seed = random_seed
         # [(row, col), (row, col), ......]
-        self.random_seed, self.over_or_under_flow = Pickle.load(data_file)
-        data_file.close()
+        self.over_or_under_flow = over_or_under_flow
 
+        self.round = 1
         self.buf = ""
 
     def get_4adjacent_pixels(self, row, col):
@@ -148,6 +146,69 @@ class Recover():
                 stored_image[row][col] = content_image[row][col]
         misc.imsave(save_name, stored_image)
 
+    def black_block_count(self, image):
+        count = 0
+        for row in xrange(0, len(self.image) - self.block_size + 1, self.block_size):
+            for col in xrange(0, len(self.image[0]) - self.block_size + 1, self.block_size):
+                if image[row][col] == 0:
+                    count += 1
+        return count
+
+
+    def boundCheckPaint(self, indList, detectUnImg, bRowOfImg, bColOfImg, blockSize):
+        flag = 0
+        for ind in indList:
+            if 0 <= ind < len(detectUnImg):
+                flag += 1
+        if flag < 4:
+            return 0
+        else:
+            if (detectUnImg[indList[0]][indList[1]] == 0) & (detectUnImg[indList[2]][indList[3]] == 0):
+                bHighBound = bRowOfImg + blockSize
+                bWidthBound = bColOfImg + blockSize
+                for rowOfBlock in range(bRowOfImg, bHighBound, 1):
+                    for colOfBlock in range(bColOfImg, bWidthBound, 1):
+                        detectUnImg[rowOfBlock][colOfBlock] = 0
+                return 1
+            else:
+                return 0
+
+
+    def refine(self, detectUnImg):
+        mark = 1
+        while mark:
+            mark = 0
+            ReBCount = 0
+            for bRowOfImg in xrange(0, len(detectUnImg), self.block_size):
+                for bColOfImg in xrange(0, len(detectUnImg[0]), self.block_size):
+                    if detectUnImg[bRowOfImg][bColOfImg] == 255:
+                        # print bRowOfImg-blockSize,bColOfImg          ,bRowOfImg+blockSize,bColOfImg
+                        mark += self.boundCheckPaint(
+                            [bRowOfImg - self.block_size, bColOfImg, bRowOfImg + self.block_size, bColOfImg],
+                            detectUnImg, bRowOfImg, bColOfImg, self.block_size)
+
+                        # print bRowOfImg          ,bColOfImg-blockSize,bRowOfImg          ,bColOfImg+blockSize
+                        mark += self.boundCheckPaint(
+                            [bRowOfImg, bColOfImg - self.block_size, bRowOfImg, bColOfImg + self.block_size],
+                            detectUnImg, bRowOfImg, bColOfImg, self.block_size)
+
+                        # print bRowOfImg-blockSize,bColOfImg-blockSize,bRowOfImg+blockSize,bColOfImg+blockSize
+                        mark += self.boundCheckPaint(
+                            [bRowOfImg - self.block_size, bColOfImg - self.block_size, bRowOfImg + self.block_size,
+                             bColOfImg + self.block_size],
+                            detectUnImg, bRowOfImg, bColOfImg, self.block_size)
+
+                        # print bRowOfImg+blockSize,bColOfImg-blockSize,bRowOfImg-blockSize,bColOfImg+blockSize
+                        mark += self.boundCheckPaint(
+                            [bRowOfImg + self.block_size, bColOfImg - self.block_size, bRowOfImg - self.block_size,
+                             bColOfImg + self.block_size],
+                            detectUnImg, bRowOfImg, bColOfImg, self.block_size)
+                    else:
+                        ReBCount += 1
+        return ReBCount, detectUnImg
+
+
+
     def extract(self):
         extracted_watermark = ""
         for i in xrange(self.round):
@@ -159,25 +220,8 @@ class Recover():
             extracted_watermark = extracted_watermark_black + extracted_watermark_white + extracted_watermark
 
         # =================================== Result ========================================
-        ori_image_misc = misc.imread("C:\\Users\\Jasper\\Desktop\\image\\Lena.bmp")
-        ori_image = ori_image_misc.tolist()
-        if ori_image == self.image:
-            print "Same"
-            # print ori_image
-            # print self.image
-
         random.seed(self.random_seed)
         regenerated_watermark = self.generated_watermark()
-
-        for i in xrange(len(extracted_watermark)):
-            if extracted_watermark[i] == '*' or \
-                            extracted_watermark[i] == regenerated_watermark[i]:
-                pass
-            else:
-                print "GG"
-                break
-        else:
-            print "Yes"
 
         # Reorder watermark string by black_and_white_interlocking
         # and transform into 2d list
@@ -185,10 +229,12 @@ class Recover():
             self.black_white_interlock(regenerated_watermark))
         inter2d_extracted_watermark = self.str_to_2Dlist(
             self.black_white_interlock(extracted_watermark))
-        detected_image = [[255 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
 
+        # Generate detected image
+        detected_image = [[255 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
         image_row_bound = len(self.image) - self.block_size + 1
         image_col_bound = len(self.image[0]) - self.block_size + 1
+        tampered = 0
         for row in xrange(0, image_row_bound, self.block_size):
             for col in xrange(0, image_col_bound, self.block_size):
                 paint = 0
@@ -200,23 +246,131 @@ class Recover():
                             pass
                         else:
                             paint = 1
-
+                            tampered = 1
                 if paint:
                     for row_within_this_block in xrange(row, row + self.block_size):
                         for col_within_this_block in xrange(col, col + self.block_size):
                             detected_image[row_within_this_block][col_within_this_block] = 0
 
-        #  Save detected image
-        self.save_image(detected_image, self.image_misc, u"output//detected.bmp")
+        if tampered == 1:
+            #  Save detected image
+            self.save_image(detected_image, self.image_misc, u"output//Detected" + file_name_without_ext[13:] + u".bmp")
+            # print "Detected image generated."
+
+            # Blocks of detected image
+            blocks_detected_image = self.black_block_count(detected_image)
+            # Count raw detected image NCC
+            different_pixel_misc = misc.imread("output//DifferentPixel" +
+                                               file_name_without_ext[13:] + ".bmp")
+            different_pixel_img = different_pixel_misc.tolist()
+            NCC_detected_image = NCC(detected_image, different_pixel_img)
+
+            #  =======================Refine image=================================
+            ReBCount, refined_detected_image = self.refine(detected_image)
+            #  Save refine detected image
+            self.save_image(refined_detected_image, self.image_misc,
+                            u"output//RefinedDetected" + file_name_without_ext[13:] + u".bmp")
+            #  Blocks of refine_detected_image
+            blocks_refine_detected_image = self.black_block_count(refined_detected_image)
+            #  Count refine detected image NCC
+            NCC_refine_detected_image = NCC(refined_detected_image, different_pixel_img)
+
+            return [NCC_detected_image, NCC_refine_detected_image,
+                    blocks_detected_image, blocks_refine_detected_image]
+
+        elif tampered == 0:
+            self.save_image(self.image, self.image_misc, u"output//Recovered" + file_name_without_ext + u".bmp")
+
+            ORIGINAL_IMAGE = "original//" + split_name[0][5:] + ".bmp"
+            Oimg_misc = misc.imread(ORIGINAL_IMAGE)
+            Oimg = Oimg_misc.tolist()
+            if Oimg == self.image:
+                pass
+            else:
+                print "Recover error!"
 
 
-def main(image_path):
-    extract_obj = Recover(image_path)
-    extract_obj.extract()
+def NCC(img1, img2):
+    sum = 0
+    sum2 = 0
+    for i in range(len(img2)):
+        for j in range(len(img2[0])):
+            sum += img1[i][j]
+            sum2 += img2[i][j]
+    mean = float(sum) / (len(img1) * len(img1[0]))
+    mean2 = float(sum2) / (len(img2) * len(img2[0]))
+
+    sum = 0
+    sum2 = 0
+    for i in range(len(img2)):
+        for j in range(len(img2[0])):
+            sum += (img1[i][j] - mean) ** 2
+            sum2 += (img2[i][j] - mean2) ** 2
+
+    mother = math.sqrt(sum * sum2)
+
+    sum = 0
+    for i in range(len(img2)):
+        for j in range(len(img2[0])):
+            sum += (img1[i][j] - mean) * (img2[i][j] - mean2)
+    return sum / mother
+
+def path_list_sort(path_list):
+    path_list.sort(key=(
+        lambda x: int(x.split(",")[2].split(".")[0])
+    ))
+    path_list.sort(key=(
+        lambda x: int(x.split(",")[1])
+    ))
+    path_list.sort(key=(
+        lambda x: x.split(",")[0]
+    ))
+
+
+def name_analysis(image):
+    # file_name_without_extension suffix
+    global file_name_without_ext, split_name
+    file_name_without_ext = os.path.splitext(os.path.basename(image))[0]
+    if file_name_without_ext[0:5] == "Stego":
+        data_file = file(os.path.split(image)[0] + u"\\" + file_name_without_ext[5:] + ".data", 'r')
+    elif file_name_without_ext[0:8] == "Tampered":
+        data_file = file(os.path.split(image)[0] + u"\\" + file_name_without_ext[13:] + ".data", 'r')
+    random_seed, over_or_under_flow = Pickle.load(data_file)
+    data_file.close()
+    split_name = file_name_without_ext.split(",")
+
+    # return THRESHOLD, T*, random_seed, over_or_under_flow
+    return int(split_name[1]), int(split_name[2]), random_seed, over_or_under_flow
+
+
+def main(block_size):
+    # tampered img path list
+    tampered_list = filter(lambda path:
+                           path if path[0:8] == "Tampered" else None,
+                           os.listdir("output"))
+    stego_list = filter(lambda path:
+                        path if path[0:5] == "Stego" else None,
+                        os.listdir("output"))
+    merge_list = tampered_list + stego_list
+    path_list_sort(merge_list)
+    result_list = []
+
+    for path in merge_list:
+        # path = u"output\\StegoLena,5,2.bmp"
+        path = "output//" + path
+        threshold, t_star, random_seed, over_or_under_flow = name_analysis(path)
+
+        extract_obj = Recover(path, threshold, t_star, random_seed, over_or_under_flow, block_size)
+        return_value = extract_obj.extract()
+
+        # Detected image, not a stego
+        if return_value:
+            result_list += [return_value]
+    return result_list
 
 
 if __name__ == '__main__':
-    main("C:\\Users\\Jasper\\Desktop\\Pps\\P4\\output\\TamperedStego.bmp")
+    main(2)
 
 
 

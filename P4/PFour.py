@@ -11,7 +11,8 @@ import xlsxwriter
 
 
 class Embed():
-    def __init__(self, image_path, threshold, t_star, rounds):
+    def __init__(self, image_path, threshold, t_star, rounds, block_size):
+        self.image_path = image_path
         self.image_misc = misc.imread(image_path)
         self.image = self.image_misc.tolist()
         self.threshold = threshold
@@ -21,9 +22,9 @@ class Embed():
         self.capacity_bits = 0
         self.over_or_under_flow = []
         self.over_or_under_flow_bits = 0
-        self.un_embeddable_image = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
-        self.un_embeddable_image2 = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
-        self.block_size = 3  # TODO
+        self.un_embeddable_img_pixel = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+        self.un_embeddable_img_block = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+        self.block_size = block_size
 
     def get_4adjacent_pixels(self, row, col):
         # Top, left, right, bot
@@ -93,7 +94,7 @@ class Embed():
                 self.image[row][col] = modified_value
 
             if embeddable:
-                self.un_embeddable_image[row][col] = 255
+                self.un_embeddable_img_pixel[row][col] = 255
 
     def hide_black(self):
         for row in xrange(0, len(self.image)):
@@ -130,22 +131,6 @@ class Embed():
             self.hide_white()
 
         # ============================= Executed ================================
-
-        print self.capacity_bits
-        print self.PSNR(self.image_misc, self.image)
-        print self.over_or_under_flow_bits
-
-        # Save data for recovering(seed, over/under flow)
-        data_file = file(u"output//stego.data", 'w')
-        Pickle.dump([random_seed, self.over_or_under_flow], data_file)
-        data_file.close()
-
-        # Save stego image
-        self.save_image(self.image, self.image_misc, u"output//Stego.bmp")
-        #  Save unbeddable-block image
-        self.save_image(self.un_embeddable_image, self.image_misc, u"output//Unembeddable.bmp")
-
-
         image_row_bound = len(self.image) - self.block_size + 1
         image_col_bound = len(self.image[0]) - self.block_size + 1
         for row in xrange(0, image_row_bound, self.block_size):
@@ -153,29 +138,51 @@ class Embed():
                 paint = 0
                 for row_within_this_block in xrange(row, row + self.block_size):
                     for col_within_this_block in xrange(col, col + self.block_size):
-                        if self.un_embeddable_image[row_within_this_block][col_within_this_block] == 255:
+                        if self.un_embeddable_img_pixel[row_within_this_block][col_within_this_block] == 255:
                             paint = 1
                 if paint:
                     for row_within_this_block in xrange(row, row + self.block_size):
                         for col_within_this_block in xrange(col, col + self.block_size):
-                            self.un_embeddable_image2[row_within_this_block][col_within_this_block] = 255
-
-        #  Save unbeddable-block image
-        self.save_image(self.un_embeddable_image2, self.image_misc, u"output//Unembeddable2.bmp")
+                            self.un_embeddable_img_block[row_within_this_block][col_within_this_block] = 255
 
 
+        output_name = get_output_name(self.image_path, self.threshold, self.t_star)
+        # Save data for recovering(seed, over/under flow)
+        data_file = file(u"output//" + output_name + u".data", 'w')
+        Pickle.dump([random_seed, self.over_or_under_flow], data_file)
+        data_file.close()
+
+        psnr = self.PSNR(self.image_misc, self.image)
+        # Save stego image
+        self.save_image(self.image, self.image_misc, u"output//Stego" + output_name + u".bmp")
+        #  Save unbeddable-block image (Pixel unit)
+        self.save_image(self.un_embeddable_img_pixel, self.image_misc, u"output//UnembeddablePixel" + output_name + u".bmp")
+        #  Save unbeddable-block image (Block unit)
+        self.save_image(self.un_embeddable_img_block, self.image_misc, u"output//UnembeddableBlock" + output_name + u".bmp")
+
+        return [self.capacity_bits, self.over_or_under_flow_bits, psnr]
 
 
+# integer to unicode string
+def int_to_uni(integer):
+    return str(integer).decode("utf-8")
 
-def main(image_path, threshold, t_star, rounds):
-    embed_obj = Embed(image_path, threshold, t_star, rounds)
-    embed_obj.hide()
+
+def get_output_name(image, threshold, t_star):
+    # picture_name_without_extension name
+    pic_name_without_ext = os.path.splitext(os.path.basename(image))[0]
+    return pic_name_without_ext + u"," + int_to_uni(threshold) + u"," + int_to_uni(t_star)
+
+
+def main(image_path, threshold, t_star, rounds, block_size):
+    embed_obj = Embed(image_path, threshold, t_star, rounds, block_size)
+    return embed_obj.hide()
 
 
 if __name__ == '__main__':
     # image, threshold, t_star
     main("C:\\Users\\Jasper\\Desktop\\image\\Lena.bmp",
-         255, 255, 1)
+         5, 2, 1, 2)
 
 
 
