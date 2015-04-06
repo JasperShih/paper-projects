@@ -58,11 +58,11 @@ def path_list_sort(path_list):
 
 def main(anchor_position, block_size):
     # anchor_position = (294, 196)
-    transparent_image = "original\\teddy_bear_256.png"
+    transparent_image = "C:\\Users\\Jasper\\Desktop\\Pps\\P4\\original\\lion.png"
     tran_misc = misc.imread(transparent_image)
     tran = tran_misc.tolist()
 
-    gray_image = "original\\teddy_bear_256.bmp"
+    gray_image = "C:\\Users\\Jasper\\Desktop\\Pps\\P4\\original\\lion.bmp"
     gray_misc = misc.imread(gray_image)
     gray = gray_misc.tolist()
 
@@ -104,4 +104,4 @@ def main(anchor_position, block_size):
     # different Pixel Count, different Block Count]
 
 if __name__ == '__main__':
-    main((294, 196), 3)
+    main((20,20), 4)

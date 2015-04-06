@@ -23,6 +23,8 @@ class Recover():
 
         self.round = 1
         self.buf = ""
+        self.un_embeddable_img_pixel = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
+        self.un_embeddable_img_block = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
 
     def get_4adjacent_pixels(self, row, col):
         # Top, left, right, bot
@@ -66,7 +68,7 @@ class Recover():
         )
 
         watermark_bit = '*'
-        if complexity < self.threshold:
+        if complexity <= self.threshold:
             # un_difference_expand
             # If current processing pixel belong overflow pixel, recover it and skip it.
             # Else, un_difference_expand
@@ -208,7 +210,6 @@ class Recover():
         return ReBCount, detectUnImg
 
 
-
     def extract(self):
         extracted_watermark = ""
         for i in xrange(self.round):
@@ -222,6 +223,7 @@ class Recover():
         # =================================== Result ========================================
         random.seed(self.random_seed)
         regenerated_watermark = self.generated_watermark()
+
 
         # Reorder watermark string by black_and_white_interlocking
         # and transform into 2d list
@@ -253,9 +255,26 @@ class Recover():
                             detected_image[row_within_this_block][col_within_this_block] = 0
 
         if tampered == 1:
+
+
+            for row in xrange(0, image_row_bound, self.block_size):
+                for col in xrange(0, image_col_bound, self.block_size):
+                    paint = 0
+                    for row_within_this_block in xrange(row, row + self.block_size):
+                        for col_within_this_block in xrange(col, col + self.block_size):
+                            if inter2d_extracted_watermark[row_within_this_block][col_within_this_block] != '*':
+                                self.un_embeddable_img_pixel[row_within_this_block][col_within_this_block] = 255
+                                paint = 1
+                    if paint:
+                        for row_within_this_block in xrange(row, row + self.block_size):
+                            for col_within_this_block in xrange(col, col + self.block_size):
+                                self.un_embeddable_img_block[row_within_this_block][col_within_this_block] = 255
+
+            self.save_image(self.un_embeddable_img_pixel, self.image_misc, u"output//ExtractablePixel" + file_name_without_ext[13:] + u".bmp")
+            self.save_image(self.un_embeddable_img_block, self.image_misc, u"output//ExtractableBlock" + file_name_without_ext[13:] + u".bmp")
+
             #  Save detected image
             self.save_image(detected_image, self.image_misc, u"output//Detected" + file_name_without_ext[13:] + u".bmp")
-            # print "Detected image generated."
 
             # Blocks of detected image
             blocks_detected_image = self.black_block_count(detected_image)

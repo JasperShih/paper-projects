@@ -7,18 +7,19 @@ import xlsxwriter
 
 image_path = "original\\Lena.bmp"
 
-threshold_list = [255]
+threshold_list = [0,1,2,3,4,6,8,10,12,14,16]
 
-t_star_list = [255]
+t_star_list = [0,1,2,3]
 rounds = 1
-block_size = 3
+block_size = 4
 
 result = []
 for threshold in threshold_list:
     for t_star in t_star_list:
         result += [[image_path[9:-4], threshold, t_star]+PFour.Embed(image_path, threshold, t_star, rounds, block_size).hide()]
-
-buf1 = PFourTamper.main((397, 251), block_size)
+# 397, 251
+# cat 20,20
+buf1 = PFourTamper.main((20,20), block_size)
 buf2 = PFourRecover.main(block_size)
 
 for i in xrange(len(result)):

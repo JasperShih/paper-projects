@@ -25,6 +25,7 @@ class Embed():
         self.un_embeddable_img_pixel = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
         self.un_embeddable_img_block = [[0 for i in xrange(len(self.image))] for i in xrange(len(self.image[0]))]
         self.block_size = block_size
+        self.hidden_str = ""
 
     def get_4adjacent_pixels(self, row, col):
         # Top, left, right, bot
@@ -53,7 +54,6 @@ class Embed():
             value_prime = value - self.t_star
         elif self.t_star < value:
             value_prime = value + self.t_star + 1
-
         return value_prime, embeddable
 
     def PSNR(self, oriNumImg, stegoImg):
@@ -78,7 +78,7 @@ class Embed():
         random_bit = random.randint(0, 1)
 
         embeddable = 0
-        if complexity < self.threshold:
+        if complexity <= self.threshold:
             difference_prime, embeddable = \
                 self.difference_expand(self.image[row][col] - filtered_4pixels_avg,
                                        random_bit, embeddable)
@@ -95,6 +95,11 @@ class Embed():
 
             if embeddable:
                 self.un_embeddable_img_pixel[row][col] = 255
+                self.hidden_str += str(random_bit)
+            else:
+                self.hidden_str += "*"
+        else:
+            self.hidden_str += "*"
 
     def hide_black(self):
         for row in xrange(0, len(self.image)):
@@ -121,15 +126,46 @@ class Embed():
                 stored_image[row][col] = content_image[row][col]
         misc.imsave(save_name, stored_image)
 
+    def black_white_interlock(self, input_str):
+        # input_str = black + white
+        white_start = int(math.ceil(float(len(input_str)) / 2))
+        output_str = ""
+        anchor = 0
+        for row in xrange(len(self.image)):
+            for col in xrange(len(self.image[0])):
+                # If (row and col belong even) and
+                # (row and col belong odd), we take black part
+                if (row % 2 == 0 and col % 2 == 0) or \
+                        (row % 2 == 1 and col % 2 == 1):
+                    output_str += input_str[anchor]
+
+                # If (row belong even and col belong odd) and
+                # (row belong odd and col belong even),
+                # we take white part
+                else:
+                    output_str += input_str[white_start + anchor]
+                if col % 2 == 1:
+                    anchor += 1
+        return output_str
+
+    def str_to_2Dlist(self, input_str):
+        output_list = []
+        for row in xrange(len(self.image)):
+            row_start = row*len(self.image[0])
+            output_list += [input_str[row_start:row_start+len(self.image[0])]]
+        return output_list
+
     def hide(self):
         random_seed = random.random()
         random.seed(random_seed)
 
         # Throughout_image_by_chessboard
         for i in xrange(self.rounds):
+            self.hidden_str = ""
             self.hide_black()
             self.hide_white()
-
+        self.hidden_str = self.str_to_2Dlist(self.black_white_interlock(self.hidden_str))
+        # print self.hidden_str
         # ============================= Executed ================================
         image_row_bound = len(self.image) - self.block_size + 1
         image_col_bound = len(self.image[0]) - self.block_size + 1
