@@ -94,8 +94,10 @@ class Embed():
             tmp /= 2
             seqComplexLen += 1
 
+
         for row in xrange(0, len(self.image) - self.block_size + 1, self.block_size):
             for col in xrange(0, len(self.image[0]) - self.block_size + 1, self.block_size):
+
                 # Get satellites. If IndexError occurs, the satellite=None
                 # [SU, SD, SR, SL] are values, not indexes
                 with omitOutIndex() as SU:
@@ -117,6 +119,7 @@ class Embed():
                 elif self.max_or_range == 1:
                     complexity = self.rangeS(satellites, self.threshold)
 
+
                 if complexity == "smooth":
                     for rowInBlock in xrange(row, row + self.block_size, 1):
                         for colInBlock in xrange(col, col + self.block_size, 1):
@@ -134,38 +137,41 @@ class Embed():
                                 elif (block_map_row == 0 and
                                               block_map_col == 1):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
+                                          self.image_original[rowInBlock + 1][colInBlock]
 
                                 elif (block_map_row == 0 and
                                               block_map_col == 2):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 2]
+                                          self.image_original[rowInBlock + 1][colInBlock]
 
                                 elif (block_map_row == 1 and
                                               block_map_col == 0):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
+                                          self.image_original[rowInBlock][colInBlock + 1]
 
                                 elif (block_map_row == 1 and
                                               block_map_col == 2):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
+                                          self.image_original[rowInBlock][colInBlock - 1]
 
                                 elif (block_map_row == 2 and
                                               block_map_col == 0):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 0]
+                                          self.image_original[rowInBlock - 1][colInBlock]
 
                                 elif (block_map_row == 2 and
                                               block_map_col == 1):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
+                                          self.image_original[rowInBlock - 1][colInBlock]
 
                                 elif (block_map_row == 2 and
                                               block_map_col == 2):
                                     dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 2][colInBlock + 1]
+                                          self.image_original[rowInBlock][colInBlock - 1]
+
                                 # ==================Spin dif Algo End========================^
+
+                                embeddable = 0
 
                                 if -self.t_star_smooth <= dif and dif <= self.t_star_smooth:
                                     seq = ""
@@ -174,6 +180,7 @@ class Embed():
                                     secret += seq
                                     seq = int(seq, 2)
                                     dif = (self.mul_smooth + 1) * dif + seq
+                                    embeddable = 1
 
                                 elif dif < -self.t_star_smooth:
                                     dif = dif - self.mul_smooth * self.t_star_smooth
@@ -181,7 +188,6 @@ class Embed():
                                 elif dif > self.t_star_smooth:
                                     dif = dif + (self.t_star_smooth + 1) * self.mul_smooth
 
-                                # TODO overflowUnderflow
                                 # ==============spin new self.image Algo====================v
                                 if block_map_row == 0 and block_map_col == 0:
                                     if 0 <= dif + self.image_original[rowInBlock][colInBlock + 1] <= 255:
@@ -189,196 +195,110 @@ class Embed():
                                             dif + self.image_original[rowInBlock][colInBlock + 1]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 0 and block_map_col == 1:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 1]
+                                            dif + self.image_original[rowInBlock + 1][colInBlock]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 0 and block_map_col == 2:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 2] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 2]
+                                            dif + self.image_original[rowInBlock + 1][colInBlock]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 1 and block_map_col == 0:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock][colInBlock + 1] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 1]
+                                            dif + self.image_original[rowInBlock][colInBlock + 1]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 1 and block_map_col == 2:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock][colInBlock - 1] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 1]
+                                            dif + self.image_original[rowInBlock][colInBlock - 1]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 2 and block_map_col == 0:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 0] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock - 1][colInBlock] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 0]
+                                            dif + self.image_original[rowInBlock - 1][colInBlock]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 2 and block_map_col == 1:
-                                    if 0 <= dif + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock - 1][colInBlock] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 1][colInBlock + 1]
+                                            dif + self.image_original[rowInBlock - 1][colInBlock]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
 
                                 elif block_map_row == 2 and block_map_col == 2:
-                                    if 0 <= dif + self.image_original[rowInBlock + 2][colInBlock + 1] <= 255:
+                                    if 0 <= dif + self.image_original[rowInBlock][colInBlock - 1] <= 255:
                                         self.image[rowInBlock][colInBlock] = \
-                                            dif + self.image_original[rowInBlock + 2][colInBlock + 1]
+                                            dif + self.image_original[rowInBlock][colInBlock - 1]
                                     else:
                                         self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqSmoothLen]
                                         # ==============spin new imgList Algo=====================^
 
                 elif complexity == "complex":
-
                     buf = []
                     for sat in satellites:
                         if sat:
                             buf.append(int(math.floor(
-                                abs((3 * self.image[row + self.mid[0]][col + self.mid[1]] + sat) / 4 - \
-                                    self.image[row + self.mid[0]][col + self.mid[1]])
+                                (3 * self.image[row + self.mid[0]][col + self.mid[1]] + sat) / 4
                             )
                             )
                             )
-
                     minLambda = min(buf)
-                    # print minLambda
+
                     for rowInBlock in xrange(row, row + self.block_size, 1):
                         for colInBlock in xrange(col, col + self.block_size, 1):
                             if rowInBlock == (row + self.mid[0]) and colInBlock == (col + self.mid[0]):
                                 pass
                             else:
-                                # ==================Spin dif Algo============================v
-                                block_map_row = rowInBlock - row
-                                block_map_col = colInBlock - col
-                                if (block_map_row == 0 and
-                                            block_map_col == 0):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock][colInBlock + 1]
+                                dif = self.image[rowInBlock][colInBlock] - minLambda
 
-                                elif (block_map_row == 0 and
-                                              block_map_col == 1):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
-
-                                elif (block_map_row == 0 and
-                                              block_map_col == 2):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 2]
-
-                                elif (block_map_row == 1 and
-                                              block_map_col == 0):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
-
-                                elif (block_map_row == 1 and
-                                              block_map_col == 2):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
-
-                                elif (block_map_row == 2 and
-                                              block_map_col == 0):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 0]
-
-                                elif (block_map_row == 2 and
-                                              block_map_col == 1):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 1][colInBlock + 1]
-
-                                elif (block_map_row == 2 and
-                                              block_map_col == 2):
-                                    dif = self.image_original[rowInBlock][colInBlock] - \
-                                          self.image_original[rowInBlock + 2][colInBlock + 1]
-                                # ==================Spin dif Algo End========================^
-
-                                dif_prime = dif - minLambda
-
-                                if -self.t_star_complex <= dif_prime and dif_prime <= self.t_star_complex:
+                                if -self.t_star_complex <= dif and dif <= self.t_star_complex:
                                     seq = ""
                                     for lenIndex in xrange(seqComplexLen):
                                         seq += str(random.randint(0, 1))
                                     secret += seq
                                     seq = int(seq, 2)
 
-                                    dif_double_prime = (self.mul_complex + 1) * dif_prime + seq
+                                    dif = (self.mul_complex + 1) * dif + seq
 
-                                elif dif_prime < -self.t_star_complex:
-                                    dif_double_prime = dif_prime - self.mul_complex * self.t_star_complex
+                                elif dif < -self.t_star_complex:
+                                    dif = dif - self.mul_complex * self.t_star_complex
 
                                 else:  # dif>TStarComplex
-                                    dif_double_prime = dif_prime + (self.t_star_complex + 1) * self.mul_complex
+                                    dif = dif + (self.t_star_complex + 1) * self.mul_complex
 
-                                dif_star = dif_double_prime + minLambda
-
-                                # ==============spin new self.image Algo====================v
-                                if block_map_row == 0 and block_map_col == 0:
-                                    if 0 <= dif_star + self.image_original[rowInBlock][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 0 and block_map_col == 1:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 0 and block_map_col == 2:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 2] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 2]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 1 and block_map_col == 0:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 1 and block_map_col == 2:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 2 and block_map_col == 0:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 0] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 0]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 2 and block_map_col == 1:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 1][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-
-                                elif block_map_row == 2 and block_map_col == 2:
-                                    if 0 <= dif_star + self.image_original[rowInBlock + 2][colInBlock + 1] <= 255:
-                                        self.image[rowInBlock][colInBlock] = \
-                                            dif_star + self.image_original[rowInBlock + 2][colInBlock + 1]
-                                    else:
-                                        self.overflow_bits += 1
-                                        # ==============spin new imgList Algo=====================^
+                                if 0 <= dif + minLambda <= 255:
+                                    self.image[rowInBlock][colInBlock] = dif + minLambda
+                                else:
+                                    self.overflow_bits += 1
 
         bbpList.append(float(len(secret)) /
                             (
@@ -386,6 +306,8 @@ class Embed():
                             )
         )
         PSNRList.append(self.PSNR(self.image_misc, self.image))
+
+        #print self.overflow_bits
 
 
 
@@ -396,24 +318,26 @@ def frange(x, y, jump):
 
 def main():
     maxOrRange = 0
-    thresholdmaxS_List = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50]
+    thresholdmaxS_List = [20]
     thresholdrangeS_List = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50]
 
-    mulSmoothList = [1, 3, 7]
-    TStarSmoothList = [0, 1, 2, 3, 4]
+    mulSmoothList = [1]
+    TStarSmoothList = [1]
 
-    mulComplexList = [1, 3, 7]
-    TStarComplexList = [0, 1, 2, 3, 4]
+    mulComplexList = [3]
+    TStarComplexList = [2]
 
     for thresholdmaxS in thresholdmaxS_List:
         for mulSmooth in mulSmoothList:
             for TStarSmooth in TStarSmoothList:
                 for mulComplex in mulComplexList:
                     for TStarComplex in TStarComplexList:
-                        embed_obj = Embed("C:\\Users\\Jasper\\Desktop\\Lena.bmp", maxOrRange, thresholdmaxS,
+                        embed_obj = Embed("C:\\Users\\Jasper\\Desktop\\test.bmp", maxOrRange, thresholdmaxS,
                                           TStarSmooth, TStarComplex, mulSmooth, mulComplex)
                         embed_obj.hiding()
 
+
+"""
     plt.xlim(0, 5)
     plt.xticks([tick for tick in frange(0, 5.1, 0.5)])
     plt.ylim(10, 60)
@@ -425,7 +349,7 @@ def main():
 
     plt.plot(bbpList, PSNRList, "ko")
     plt.show()
-
+"""
 
 if __name__ == '__main__':
     main()
