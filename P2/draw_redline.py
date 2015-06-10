@@ -39,7 +39,7 @@ def get_best_line(filename):
     line_PSNR = [j for i, j, k in line]
     line_argument = [k for i, j, k in line]
 
-    return line_bbp, line_PSNR
+    return line_bbp, line_PSNR, bbpList, PSNRList
 
 """
 count = {}
@@ -69,20 +69,16 @@ plt.yticks([tick for tick in frange(bound_left2, bound_right2, 5)])
 
 plt.xlabel("Embedding Rate (BBP)")
 plt.ylabel("PSNR (dB)")
-plt.title("Lena")
+plt.title("Tiffany")
 
-line_bbp1, line_PSNR1 = get_best_line("Lena_thr5.data")
-line_bbp2, line_PSNR2 = get_best_line("Lena_thr10.data")
-line_bbp3, line_PSNR3 = get_best_line("Lena_thr15.data")
-line_bbp4, line_PSNR4 = get_best_line("Lena_thr20.data")
-#plt.plot(bbpList, PSNRList, "ko")
-plt.plot(line_bbp1, line_PSNR1, "r8:", linewidth = 2)
-plt.plot(line_bbp2, line_PSNR2, "b8:", linewidth = 2)
-plt.plot(line_bbp3, line_PSNR3, "g8:", linewidth = 2)
-plt.plot(line_bbp4, line_PSNR4, "k8:", linewidth = 2)
+line_bbp1, line_PSNR1, bbpList, PSNRList = get_best_line("Tiffany.data")
+
+plt.plot(bbpList, PSNRList, "k.")
+plt.plot(line_bbp1, line_PSNR1, "ro", linewidth = 2)
+
 
 fig = plt.gcf()
-fig.set_size_inches(11, 8)
-fig.savefig('test2png.png',dpi=100)
+fig.set_size_inches(11, 8.5)
+fig.savefig('123.png',dpi=100)
 
 plt.show()

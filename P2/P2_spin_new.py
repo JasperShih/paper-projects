@@ -4,6 +4,7 @@ import math
 import sys
 import scipy.misc as misc, random
 import matplotlib.pyplot as plt
+import cPickle as Pickle
 
 
 class omitOutIndex:
@@ -16,8 +17,6 @@ class omitOutIndex:
     def __exit__(self, exception_type, exception_value, exception_traceback):
         return True
 
-bbpList = []
-PSNRList = []
 
 class Embed():
     def __init__(self, image_path, max_or_range, threshold,
@@ -266,39 +265,161 @@ class Embed():
                     buf = []
                     for sat in satellites:
                         if sat:
-                            buf.append(int(math.floor(
-                                (3 * self.image[row + self.mid[0]][col + self.mid[1]] + sat) / 4
+                            buf.append(int(abs(
+                                math.floor((3 * self.image[row + self.mid[0]][col + self.mid[1]] + sat) / 4 - \
+                                    self.image[row + self.mid[0]][col + self.mid[1]])
                             )
                             )
                             )
+
                     minLambda = min(buf)
 
+                    #print minLambda
                     for rowInBlock in xrange(row, row + self.block_size, 1):
                         for colInBlock in xrange(col, col + self.block_size, 1):
                             if rowInBlock == (row + self.mid[0]) and colInBlock == (col + self.mid[0]):
                                 pass
                             else:
-                                dif = self.image[rowInBlock][colInBlock] - minLambda
+                                # ==================Spin dif Algo============================v
+                                block_map_row = rowInBlock - row
+                                block_map_col = colInBlock - col
+                                if (block_map_row == 0 and
+                                            block_map_col == 0):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock][colInBlock + 1]
 
-                                if -self.t_star_complex <= dif and dif <= self.t_star_complex:
+                                elif (block_map_row == 0 and
+                                              block_map_col == 1):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock + 1][colInBlock]
+
+                                elif (block_map_row == 0 and
+                                              block_map_col == 2):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock + 1][colInBlock]
+
+                                elif (block_map_row == 1 and
+                                              block_map_col == 0):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock][colInBlock + 1]
+
+                                elif (block_map_row == 1 and
+                                              block_map_col == 2):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock][colInBlock - 1]
+
+                                elif (block_map_row == 2 and
+                                              block_map_col == 0):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock - 1][colInBlock]
+
+                                elif (block_map_row == 2 and
+                                              block_map_col == 1):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock - 1][colInBlock]
+
+                                elif (block_map_row == 2 and
+                                              block_map_col == 2):
+                                    dif = self.image_original[rowInBlock][colInBlock] - \
+                                          self.image_original[rowInBlock][colInBlock - 1]
+
+                                # ==================Spin dif Algo End========================^
+
+                                dif_prime = dif - minLambda
+
+                                embeddable = 0
+                                if -self.t_star_complex <= dif_prime and dif_prime <= self.t_star_complex:
                                     seq = ""
                                     for lenIndex in xrange(seqComplexLen):
                                         seq += str(random.randint(0, 1))
                                     secret += seq
                                     seq = int(seq, 2)
 
-                                    dif = (self.mul_complex + 1) * dif + seq
+                                    dif_double_prime = (self.mul_complex + 1) * dif_prime + seq
+                                    embeddable = 1
 
-                                elif dif < -self.t_star_complex:
-                                    dif = dif - self.mul_complex * self.t_star_complex
+                                elif dif_prime < -self.t_star_complex:
+                                    dif_double_prime = dif_prime - self.mul_complex * self.t_star_complex
 
                                 else:  # dif>TStarComplex
-                                    dif = dif + (self.t_star_complex + 1) * self.mul_complex
+                                    dif_double_prime = dif_prime + (self.t_star_complex + 1) * self.mul_complex
 
-                                if 0 <= dif + minLambda <= 255:
-                                    self.image[rowInBlock][colInBlock] = dif + minLambda
-                                else:
-                                    self.overflow_bits += 1
+                                dif_star = dif_double_prime + minLambda
+
+
+                                # ==============spin new self.image Algo====================v
+                                if block_map_row == 0 and block_map_col == 0:
+                                    if 0 <= dif_star + self.image_original[rowInBlock][colInBlock + 1] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock][colInBlock + 1]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 0 and block_map_col == 1:
+                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock + 1][colInBlock]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 0 and block_map_col == 2:
+                                    if 0 <= dif_star + self.image_original[rowInBlock + 1][colInBlock] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock + 1][colInBlock]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 1 and block_map_col == 0:
+                                    if 0 <= dif_star + self.image_original[rowInBlock][colInBlock + 1] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock][colInBlock + 1]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 1 and block_map_col == 2:
+                                    if 0 <= dif_star + self.image_original[rowInBlock][colInBlock - 1] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock][colInBlock - 1]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 2 and block_map_col == 0:
+                                    if 0 <= dif_star + self.image_original[rowInBlock - 1][colInBlock] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock - 1][colInBlock]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 2 and block_map_col == 1:
+                                    if 0 <= dif_star + self.image_original[rowInBlock - 1][colInBlock] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock - 1][colInBlock]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+
+                                elif block_map_row == 2 and block_map_col == 2:
+                                    if 0 <= dif_star + self.image_original[rowInBlock][colInBlock - 1] <= 255:
+                                        self.image[rowInBlock][colInBlock] = \
+                                            dif_star + self.image_original[rowInBlock][colInBlock - 1]
+                                    else:
+                                        self.overflow_bits += 1
+                                        if embeddable:
+                                            secret = secret[0:-seqComplexLen]
+                                        # ==============spin new imgList Algo=====================^
 
         bbpList.append(float(len(secret)) /
                             (
@@ -307,7 +428,7 @@ class Embed():
         )
         PSNRList.append(self.PSNR(self.image_misc, self.image))
 
-        #print self.overflow_bits
+        return self.overflow_bits
 
 
 
@@ -317,27 +438,43 @@ def frange(x, y, jump):
         x += jump
 
 def main():
-    maxOrRange = 0
-    thresholdmaxS_List = [20]
-    thresholdrangeS_List = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50]
+    global bbpList, PSNRList
+    bbpList = []
+    PSNRList = []
 
-    mulSmoothList = [1]
-    TStarSmoothList = [1]
+    max_or_range = 0
+    threshold_list = [4, 5, 6, 8, 10, 15, 20, 30, 40]
 
-    mulComplexList = [3]
-    TStarComplexList = [2]
+    mul_smooth_list = [1, 3, 7, 15]
+    t_star_smooth_list = [2,3,4,6,8,10]
 
-    for thresholdmaxS in thresholdmaxS_List:
-        for mulSmooth in mulSmoothList:
-            for TStarSmooth in TStarSmoothList:
-                for mulComplex in mulComplexList:
-                    for TStarComplex in TStarComplexList:
-                        embed_obj = Embed("C:\\Users\\Jasper\\Desktop\\test.bmp", maxOrRange, thresholdmaxS,
-                                          TStarSmooth, TStarComplex, mulSmooth, mulComplex)
-                        embed_obj.hiding()
+    mul_complex_list = [1, 3, 7, 15]
+    t_star_complex_list = [0, 2, 4, 6, 8, 10]
 
+    argument = []
+    for threshold in threshold_list:
+        for mul_smooth in mul_smooth_list:
+            for t_star_smooth in t_star_smooth_list:
+                for mul_complex in mul_complex_list:
+                    for t_star_complex in t_star_complex_list:
+                        embed_obj = Embed("C:\\Users\\Jasper\\Desktop\\image\\Baboon.bmp", max_or_range, threshold,
+                                          t_star_smooth, t_star_complex, mul_smooth, mul_complex)
+                        overflow_bits = embed_obj.hiding()
+                        argument += [[max_or_range, threshold, t_star_smooth, t_star_complex,
+                                      mul_smooth, mul_complex, overflow_bits]]
+    """
+    data_file = file("Lena.data", 'r')
+    previous = Pickle.load(data_file)
+    data_file.close()
+    bbpList += previous[0]
+    PSNRList += previous[1]
+    argument += previous[2]
+    """
+    output_buf = [bbpList, PSNRList, argument]
+    data_file = file(u"Baboon.data", 'w')
+    Pickle.dump(output_buf, data_file)
+    data_file.close()
 
-"""
     plt.xlim(0, 5)
     plt.xticks([tick for tick in frange(0, 5.1, 0.5)])
     plt.ylim(10, 60)
@@ -345,11 +482,11 @@ def main():
 
     plt.xlabel("BBP")
     plt.ylabel("PSNR")
-    plt.title("RangeTH")
+    plt.title("maxTH")
 
     plt.plot(bbpList, PSNRList, "ko")
     plt.show()
-"""
+
 
 if __name__ == '__main__':
     main()
