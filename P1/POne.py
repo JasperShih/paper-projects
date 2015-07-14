@@ -19,26 +19,8 @@ class IgnoreOutIndex:
 
 
 class Embed():
-    THRESHOLD = None  # Th
-    T_STAR = None  # T*
-    MAX_OR_RANGE = None
-
     BLOCK_SIZE = 3
     MID = (1, 1)
-
-    image = None
-    copy_image = None
-    capacity_blocks = 0
-    capacity_bits = 0
-    over_or_under_flow = []
-
-    # all_smooth_blocks in the image, no matter it can be embed or not
-    all_smooth_blocks = 0
-    all_complex_blocks = 0
-
-    # all_embeddable_smooth_blocks in the image
-    all_embeddable_smooth_blocks = 0
-    all_embeddable_complex_blocks = 0
 
     def __init__(self, image, threshold, t_star, max_or_range):
         self.image = image
@@ -46,6 +28,18 @@ class Embed():
         self.THRESHOLD = threshold
         self.T_STAR = t_star
         self.MAX_OR_RANGE = max_or_range
+
+        self.capacity_blocks = 0
+        self.capacity_bits = 0
+        self.over_or_under_flow = []
+
+        # all_smooth_blocks in the image, no matter it can be embed or not
+        self.all_smooth_blocks = 0
+        self.all_complex_blocks = 0
+
+        # all_embeddable_smooth_blocks in the image
+        self.all_embeddable_smooth_blocks = 0
+        self.all_embeddable_complex_blocks = 0
 
     def get_satellites(self, row, col):
         # Get satellites. If IndexError occurs, the satellite=None
@@ -77,7 +71,9 @@ class Embed():
                     sat - self.image[row + self.MID[0]][col + self.MID[1]]
                 )
                 )
-        if max(buf) < self.THRESHOLD:
+        if buf == []:
+            return "smooth"
+        elif max(buf) < self.THRESHOLD:
             return "smooth"
         else:
             return "complex"
@@ -125,12 +121,12 @@ class Embed():
 
         self.image[central_row][central_col - 1] = dLPrime + self.image[central_row][central_col]
         if (self.image[central_row][central_col - 1] > 255) or (self.image[central_row][central_col - 1] < 0):
-            print "overflow/underflow! 1"
+            #print "overflow/underflow! 1"
             self.image[central_row][central_col - 1] = self.copy_image[central_row][central_col - 1]
             self.over_or_under_flow.append((central_row, central_col - 1))
         self.image[central_row][central_col + 1] = dRPrime + self.image[central_row][central_col]
         if (self.image[central_row][central_col + 1] > 255) or (self.image[central_row][central_col + 1] < 0):
-            print "overflow/underflow! 2"
+            #print "overflow/underflow! 2"
             self.image[central_row][central_col + 1] = self.copy_image[central_row][central_col + 1]
             self.over_or_under_flow.append((central_row, central_col + 1))
 
@@ -204,13 +200,13 @@ class Embed():
         # ======modify C this time=========
         self.image[Llocat[0]][Llocat[1]] = dLPrime + self.image[row + self.MID[0]][col + self.MID[1]]
         if (self.image[Llocat[0]][Llocat[1]] > 255) or (self.image[Llocat[0]][Llocat[1]] < 0):
-            print "overflow/underflow! 3"
+            #print "overflow/underflow! 3"
             self.image[Llocat[0]][Llocat[1]] = self.copy_image[Llocat[0]][Llocat[1]]
             self.over_or_under_flow.append((Llocat[0], Llocat[1]))
 
         self.image[Rlocat[0]][Rlocat[1]] = dRPrime + self.image[row + self.MID[0]][col + self.MID[1]]
         if (self.image[Rlocat[0]][Rlocat[1]] > 255) or (self.image[Rlocat[0]][Rlocat[1]] < 0):
-            print "overflow/underflow! 4"
+            #print "overflow/underflow! 4"
             self.image[Rlocat[0]][Rlocat[1]] = self.copy_image[Rlocat[0]][Rlocat[1]]
             self.over_or_under_flow.append((Rlocat[0], Rlocat[1]))
 
@@ -244,9 +240,9 @@ class Embed():
                 satellites = self.get_satellites(row, col)
 
                 # Complexity computing
-                if MAX_OR_RANGE == 0:
+                if self.MAX_OR_RANGE == 0:
                     complexity = self.max_classify(row, col, satellites)
-                elif MAX_OR_RANGE == 1:
+                elif self.MAX_OR_RANGE == 1:
                     complexity = self.range_classify(satellites)
 
                 # Hiding
@@ -273,14 +269,16 @@ class Embed():
                 if embeddable:
                     for row_within_this_block in xrange(row, row + self.BLOCK_SIZE):
                         for col_within_this_block in xrange(col, col + self.BLOCK_SIZE):
-                            un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
+                            pass  # TODO
+                            #un_embeddable_block_image[row_within_this_block][col_within_this_block] = 255
 
+        psnr = self.PSNR(self.copy_image, self.image)
         #print self.image
         #print "capacity_blocks:", str(self.capacity_blocks)
         print "capacity_bits:", str(self.capacity_bits)
-        #print self.over_or_under_flow
+        print "overflow bits", len(self.over_or_under_flow)
         #print un_embeddable_block_image
-        print "PSNR:" + str(self.PSNR(self.copy_image, self.image))
+        print "PSNR:", psnr
         # We have to save T*, THRESHOLD, seed, over_underflow
 
         print "all_smooth_blocks:", self.all_smooth_blocks
@@ -289,10 +287,14 @@ class Embed():
         print "all_embeddable_complex_blocks:", self.all_embeddable_complex_blocks
         print "====================================="
 
+        return self.capacity_bits, psnr
 
 if __name__ == '__main__':
-    IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\Lena.bmp"
-    THRESHOLD_LIST = [40]
+    # C:\\Users\\Jasper\\Desktop\\image\\Peppers.bmp
+    # C:\\Users\\Jasper\\Downloads\\kod\\kodim02.bmp
+
+    IMAGE_LIST = "C:\\Users\\Jasper\\Desktop\\kodim17.bmp"
+    THRESHOLD_LIST = [100]
     T_STAR_LIST = [1]
     MAX_OR_RANGE = 0  # 0=max, 1=range
 
